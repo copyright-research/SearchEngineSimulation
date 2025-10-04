@@ -1,36 +1,167 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Copyright Search 🔍
 
-## Getting Started
+A modern, fast, and elegant search engine powered by Google Custom Search API, built with Next.js 15.
 
-First, run the development server:
+![Next.js](https://img.shields.io/badge/Next.js-15.5-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8?logo=tailwind-css)
 
+## ✨ Features
+
+- 🎨 **Beautiful UI**: Modern gradient design with smooth animations
+- ⚡ **Fast**: Server-side rendering with Next.js App Router
+- 🔒 **Secure**: Built-in rate limiting and API protection
+- 📱 **Responsive**: Works perfectly on mobile and desktop
+- ⌨️ **Keyboard Shortcuts**: Press `/` to focus search
+- 🖼️ **Rich Results**: Displays thumbnails and favicons
+- 🎯 **Type-safe**: Full TypeScript support
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ or Bun
+- Google Cloud account (for API keys)
+
+### Installation
+
+1. **Clone and install dependencies**:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Configure environment variables**:
+```bash
+cp env.example .env.local
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Edit `.env.local` and add your credentials:
+```env
+GOOGLE_API_KEY=your_google_api_key_here
+GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id_here
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See [SETUP.md](./SETUP.md) for detailed instructions on obtaining API keys.
 
-## Learn More
+3. **Run the development server**:
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000) to see the app.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔒 Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project includes multiple layers of security:
 
-## Deploy on Vercel
+- ✅ **Rate Limiting**: 10 requests/hour per IP
+- ✅ **Daily Quota**: 90 requests/day globally (protects free tier)
+- ✅ **Input Validation**: Query length limits and sanitization
+- ✅ **API Protection**: Keys stored server-side only
+- ✅ **Security Headers**: XSS, clickjacking protection
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See [SECURITY.md](./SECURITY.md) for detailed security configuration.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Current Limits
+
+- **Per IP**: 10 searches per hour
+- **Global**: 90 searches per day (protects Google's 100/day free quota)
+
+To adjust limits, edit `app/api/search/route.ts`:
+```typescript
+const ipLimiter = rateLimit({
+  interval: 60 * 60 * 1000, // 1 hour
+  maxRequests: 10, // Adjust this
+});
+```
+
+## 📁 Project Structure
+
+```
+copyright/
+├── app/
+│   ├── api/search/          # Search API endpoint
+│   ├── page.tsx             # Main search page
+│   └── layout.tsx           # Root layout
+├── components/
+│   ├── SearchBar.tsx        # Search input component
+│   └── SearchResults.tsx    # Results display
+├── lib/
+│   ├── google-search.ts     # Google API wrapper
+│   └── rate-limit.ts        # Rate limiting logic
+├── types/
+│   └── search.ts            # TypeScript types
+└── vercel.json              # Vercel configuration
+```
+
+## 🎨 Tech Stack
+
+- **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **API**: [Google Custom Search API](https://developers.google.com/custom-search)
+- **Deployment**: [Vercel](https://vercel.com/)
+
+## 🌐 Deployment
+
+### Deploy to Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import project in [Vercel](https://vercel.com/new)
+3. Add environment variables:
+   - `GOOGLE_API_KEY`
+   - `GOOGLE_SEARCH_ENGINE_ID`
+4. Deploy!
+
+The app will be live with automatic HTTPS and global CDN.
+
+## 💰 Cost Estimation
+
+### Google Custom Search API
+- **Free Tier**: 100 searches/day
+- **Paid**: $5 per 1,000 queries
+
+### Current Configuration
+With rate limiting (10/hour/IP + 90/day global), you'll stay within the free tier for small-scale usage.
+
+## 📚 Documentation
+
+- [SETUP.md](./SETUP.md) - Detailed setup instructions
+- [SECURITY.md](./SECURITY.md) - Security configuration guide
+
+## 🛠️ Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Lint code
+npm run lint
+```
+
+## 🎯 Keyboard Shortcuts
+
+- `/` - Focus search input
+- `Esc` - Blur search input
+- `Enter` - Submit search
+
+## 📝 License
+
+MIT
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to open issues or submit PRs.
+
+---
+
+Built with ❤️ using Next.js and Google Custom Search API
