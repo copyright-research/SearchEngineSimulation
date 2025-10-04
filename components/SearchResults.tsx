@@ -48,7 +48,7 @@ export default function SearchResults({
             </div>
             <div className="ml-3">
               <p className="text-sm text-red-700">
-                搜索出错: {error}
+                Search error: {error}
               </p>
             </div>
           </div>
@@ -73,8 +73,8 @@ export default function SearchResults({
             d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <h3 className="mt-2 text-sm font-medium text-gray-900">没有找到相关结果</h3>
-        <p className="mt-1 text-sm text-gray-500">试试其他关键词吧</p>
+        <h3 className="mt-2 text-sm font-medium text-gray-900">No results found</h3>
+        <p className="mt-1 text-sm text-gray-500">Try different keywords</p>
       </div>
     );
   }
@@ -83,9 +83,9 @@ export default function SearchResults({
     <div className="w-full max-w-4xl mx-auto mt-8 mb-12">
       {searchTime && totalResults && (
         <div className="text-sm text-gray-500 mb-6 px-2">
-          找到约 <span className="font-medium text-gray-700">{totalResults}</span> 条结果 
+          About <span className="font-medium text-gray-700">{totalResults}</span> results
           <span className="text-gray-400"> · </span>
-          用时 {searchTime.toFixed(2)} 秒
+          {searchTime.toFixed(2)} seconds
         </div>
       )}
 
@@ -122,21 +122,7 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
       }}
     >
       <div className="flex gap-4">
-        {/* 左侧：缩略图（如果有） */}
-        {thumbnail && !imgError && (
-          <div className="flex-shrink-0 w-28 h-28 relative rounded-lg overflow-hidden bg-gray-100 group-hover:shadow-lg transition-shadow">
-            <Image
-              src={thumbnail.src}
-              alt={result.title}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-              sizes="112px"
-              onError={() => setImgError(true)}
-            />
-          </div>
-        )}
-        
-        {/* 右侧：内容 */}
+        {/* 左侧：内容 */}
         <div className="flex-1 min-w-0">
           {/* 网站信息 */}
           <div className="flex items-center gap-2 mb-2">
@@ -184,6 +170,20 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
             </div>
           )}
         </div>
+
+        {/* 右侧：缩略图（如果有） */}
+        {thumbnail && !imgError && (
+          <div className="flex-shrink-0 w-28 h-28 relative rounded-lg overflow-hidden bg-gray-100 group-hover:shadow-lg transition-shadow">
+            <Image
+              src={thumbnail.src}
+              alt={result.title}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              sizes="112px"
+              onError={() => setImgError(true)}
+            />
+          </div>
+        )}
       </div>
     </article>
   );

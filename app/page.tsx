@@ -36,7 +36,7 @@ export default function Home() {
         totalResults: data.searchInformation?.formattedTotalResults,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '搜索失败，请稍后重试');
+      setError(err instanceof Error ? err.message : 'Search failed, please try again later');
       setResults([]);
     } finally {
       setIsLoading(false);
@@ -61,7 +61,7 @@ export default function Home() {
             </h1>
             {!hasSearched && (
               <p className="mt-4 text-gray-600 text-lg animate-fade-in">
-                快速、精准、优雅的搜索体验
+                Fast, accurate, and elegant search experience
               </p>
             )}
           </div>
@@ -84,7 +84,7 @@ export default function Home() {
         {!hasSearched && (
           <footer className="absolute bottom-8 left-0 right-0 text-center text-sm text-gray-500">
             <p>
-              提示: 按 <kbd className="px-2 py-1 bg-white/80 backdrop-blur-sm rounded border border-gray-300 shadow-sm text-xs font-mono">/</kbd> 快速聚焦搜索框
+              Tip: Press <kbd className="px-2 py-1 bg-white/80 backdrop-blur-sm rounded border border-gray-300 shadow-sm text-xs font-mono">/</kbd> to focus search
             </p>
           </footer>
         )}

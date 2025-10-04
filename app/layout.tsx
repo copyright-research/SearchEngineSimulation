@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Copyright Search - 快速搜索引擎",
-  description: "基于 Google Custom Search API 的现代化搜索引擎",
-  keywords: ["搜索", "search", "google", "搜索引擎"],
+  title: "Copyright Search - Fast Search Engine",
+  description: "Modern search engine powered by Google Custom Search API",
+  keywords: ["search", "google", "search engine", "web search"],
 };
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body className="antialiased">
         {children}
       </body>
