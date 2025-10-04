@@ -1,103 +1,94 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import SearchBar from '@/components/SearchBar';
+import SearchResults from '@/components/SearchResults';
+import type { GoogleSearchResponse, SearchResult } from '@/types/search';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchInfo, setSearchInfo] = useState<{
+    searchTime?: number;
+    totalResults?: string;
+  }>({});
+  const [hasSearched, setHasSearched] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+  const handleSearch = async (query: string) => {
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Search failed');
+      }
+
+      const data: GoogleSearchResponse = await response.json();
+      
+      setResults(data.items || []);
+      setSearchInfo({
+        searchTime: data.searchInformation?.searchTime,
+        totalResults: data.searchInformation?.formattedTotalResults,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '搜索失败，请稍后重试');
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50">
+      {/* 背景装饰 */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+      </div>
+
+      <main className="container mx-auto px-4 relative">
+        {/* Header */}
+        <header className={`transition-all duration-500 ${hasSearched ? 'pt-8 pb-6' : 'pt-32 pb-12'}`}>
+          <div className="text-center mb-8">
+            <h1 className={`font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 transition-all duration-500 ${hasSearched ? 'text-3xl' : 'text-6xl'}`}>
+              Copyright Search
+            </h1>
+            {!hasSearched && (
+              <p className="mt-4 text-gray-600 text-lg animate-fade-in">
+                快速、精准、优雅的搜索体验
+              </p>
+            )}
+          </div>
+          
+          <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+        </header>
+
+        {/* Search Results */}
+        {hasSearched && (
+          <SearchResults
+            results={results}
+            searchTime={searchInfo.searchTime}
+            totalResults={searchInfo.totalResults}
+            isLoading={isLoading}
+            error={error || undefined}
+          />
+        )}
+
+        {/* Footer */}
+        {!hasSearched && (
+          <footer className="absolute bottom-8 left-0 right-0 text-center text-sm text-gray-500">
+            <p>
+              提示: 按 <kbd className="px-2 py-1 bg-white/80 backdrop-blur-sm rounded border border-gray-300 shadow-sm text-xs font-mono">/</kbd> 快速聚焦搜索框
+            </p>
+          </footer>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
