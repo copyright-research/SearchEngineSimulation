@@ -8,6 +8,7 @@ A modern, fast, and elegant search engine powered by Google Custom Search API, b
 
 ## ✨ Features
 
+- 🤖 **AI Overview**: Intelligent summaries powered by GROQ GPT-4o-mini
 - 🎨 **Beautiful UI**: Modern gradient design with smooth animations
 - ⚡ **Fast**: Server-side rendering with Next.js App Router
 - 🔒 **Secure**: Built-in rate limiting and API protection
@@ -39,9 +40,11 @@ Edit `.env.local` and add your credentials:
 ```env
 GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id_here
+GROQ_API_KEY=your_GROQ_api_key_here
 ```
 
-See [SETUP.md](./SETUP.md) for detailed instructions on obtaining API keys.
+See [SETUP.md](./SETUP.md) for detailed instructions on obtaining Google API keys.
+See [AI_OVERVIEW.md](./AI_OVERVIEW.md) for AI Overview setup and configuration.
 
 3. **Run the development server**:
 ```bash
@@ -99,7 +102,8 @@ copyright/
 - **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **API**: [Google Custom Search API](https://developers.google.com/custom-search)
+- **Search API**: [Google Custom Search API](https://developers.google.com/custom-search)
+- **AI**: [Vercel AI SDK](https://sdk.vercel.ai/) + [GROQ GPT-4o-mini](https://GROQ.com/)
 - **Deployment**: [Vercel](https://vercel.com/)
 
 ## 🌐 Deployment
@@ -111,6 +115,7 @@ copyright/
 3. Add environment variables:
    - `GOOGLE_API_KEY`
    - `GOOGLE_SEARCH_ENGINE_ID`
+   - `GROQ_API_KEY` (for AI Overview)
 4. Deploy!
 
 The app will be live with automatic HTTPS and global CDN.
@@ -121,13 +126,21 @@ The app will be live with automatic HTTPS and global CDN.
 - **Free Tier**: 100 searches/day
 - **Paid**: $5 per 1,000 queries
 
-### Current Configuration
-With rate limiting (10/hour/IP + 90/day global), you'll stay within the free tier for small-scale usage.
+### GROQ GPT-4o-mini (AI Overview)
+- **Cost**: ~$0.00024 per search
+- **Monthly**: ~$0.65 for 2,700 searches
+
+### Total Monthly Cost (Free Tier)
+With rate limiting (10/hour/IP + 90/day global):
+- Google: **$0** (within free tier)
+- GROQ: **~$0.65**
+- **Total: Less than $1/month** 🎉
 
 ## 📚 Documentation
 
 - [SETUP.md](./SETUP.md) - Detailed setup instructions
 - [SECURITY.md](./SECURITY.md) - Security configuration guide
+- [AI_OVERVIEW.md](./AI_OVERVIEW.md) - AI Overview feature documentation
 
 ## 🛠️ Development
 

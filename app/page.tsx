@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import SearchBar from '@/components/SearchBar';
 import SearchResults from '@/components/SearchResults';
+import AIOverview from '@/components/AIOverview';
 import type { GoogleSearchResponse, SearchResult } from '@/types/search';
 
 export default function Home() {
@@ -14,11 +15,13 @@ export default function Home() {
     totalResults?: string;
   }>({});
   const [hasSearched, setHasSearched] = useState(false);
+  const [currentQuery, setCurrentQuery] = useState('');
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
+    setCurrentQuery(query);
 
     try {
       const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -68,6 +71,11 @@ export default function Home() {
           
           <SearchBar onSearch={handleSearch} isLoading={isLoading} />
         </header>
+
+        {/* AI Overview */}
+        {hasSearched && !isLoading && !error && results.length > 0 && (
+          <AIOverview query={currentQuery} results={results} />
+        )}
 
         {/* Search Results */}
         {hasSearched && (
