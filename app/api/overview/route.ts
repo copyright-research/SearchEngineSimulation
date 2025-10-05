@@ -41,29 +41,61 @@ export async function POST(req: Request) {
       })
       .join('\n\n');
 
-    const prompt = `You are an AI assistant providing search overviews in a structured format. Based on the search results for "${query}", create a comprehensive summary.
+    const prompt = `You are an AI assistant providing search overviews in Google's style. Based on the search results for "${query}", create a comprehensive, well-structured summary.
 
 Search Results:
 ${context}
 
-Format your response EXACTLY like this structure:
+STRUCTURE REQUIREMENTS:
 
-1. Start with 1-2 paragraphs summarizing the main answer, with inline citations like [1, 2, 3]
-2. If relevant, include a video link in this format: "You can watch this video: https://example.com (https://example.com)"
-3. Add a "Key Details" section with bullet points
-4. Each bullet point should have inline citations [1, 2, 3]
+1. OPENING PARAGRAPH (1-2 paragraphs):
+   - Directly answer the core question
+   - Be concise but comprehensive
+   - End with dense citations like [1, 2, 3, 4, 5, 6, 7]
+   - Example: "ChatGPT is a conversational AI developed by OpenAI... [1, 2, 3, 4, 5]"
 
-Important rules:
-- Use markdown
-- Use inline citations [1], [2], [3], etc. throughout the text
-- Place citations AFTER the relevant sentence or phrase
-- Use multiple citations [1, 2, 3] when information comes from multiple sources
-- Use markdown bullet points syntax for the Key Details section
-- Keep the tone informative and conversational
-- Be concise but comprehensive
-- Synthesize information from multiple sources when possible
-- Do NOT make up information - only use what's in the search results
-- Do NOT include the source URLs in your response (they will be added separately)
+2. STRUCTURED SECTIONS (Use ## headings):
+   - Choose section titles based on the query type:
+     * For "what happened" queries: Use chronological sections (e.g., "What happened", "Key facts")
+     * For "how does X work" queries: Use process sections (e.g., "How it works", "Key functionalities")
+     * For "what is X" queries: Use categorical sections (e.g., "Key Aspects", "Key Characteristics")
+     * For historical queries: Use timeline sections (e.g., "Imperial era", "Modern expansion")
+   - Each section should have 3-6 bullet points
+   - Use sub-bullets (indented with tabs) when breaking down complex points
+   - Every bullet point MUST end with citations [1, 2, 3]
+
+3. VIDEO LINKS (if relevant):
+   - Format: "You can watch this video: https://example.com (https://example.com)"
+   - Or: "This video explains [topic]: https://example.com (https://example.com)"
+   - Place after relevant sections, not in the opening
+
+4. CITATION RULES:
+   - Opening paragraph: Dense citations at the end [1, 2, 3, 4, 5, 6, 7]
+   - Section bullets: Specific citations after each point [1], [2, 3], [4, 5, 6]
+   - Sub-bullets: Also include citations
+   - Use [1, 2] when info comes from multiple sources
+   - You have up to 10 sources available
+
+5. MARKDOWN FORMATTING:
+   - Use ## for section headings
+   - Use - for bullet points
+   - Use indentation (tabs) for sub-bullets
+   - Use **bold** for emphasis on key terms (sparingly)
+   - Use \`code\` for technical terms if appropriate
+
+6. TONE & STYLE:
+   - Informative and conversational
+   - Direct and confident
+   - Synthesize information from multiple sources
+   - Avoid phrases like "According to the sources" or "The search results show"
+   - Present information as factual statements
+
+7. IMPORTANT CONSTRAINTS:
+   - Do NOT make up information - only use what's in the search results
+   - Do NOT include source URLs in citations (they will be added separately)
+   - Do NOT use generic section titles like "Key Details" for every response
+   - Do NOT forget citations on any bullet point
+   - Do NOT add a disclaimer at the end (it will be added automatically)
 
 Overview:`;
 

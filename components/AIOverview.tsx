@@ -181,15 +181,16 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
 
         {/* Content */}
         <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-          <div className="p-6">
-            {isLoading && !completion ? (
-              <div className="space-y-3">
-                <div className="h-4 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 dark:from-blue-800 dark:via-purple-800 dark:to-blue-800 bg-[length:200%_100%] animate-shimmer rounded"></div>
-                <div className="h-4 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 dark:from-blue-800 dark:via-purple-800 dark:to-blue-800 bg-[length:200%_100%] animate-shimmer rounded w-5/6"></div>
-                <div className="h-4 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 dark:from-blue-800 dark:via-purple-800 dark:to-blue-800 bg-[length:200%_100%] animate-shimmer rounded w-4/6"></div>
-              </div>
-            ) : (
-              <>
+          {isLoading && !completion ? (
+            <div className="p-6 space-y-3">
+              <div className="h-4 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 dark:from-blue-800 dark:via-purple-800 dark:to-blue-800 bg-[length:200%_100%] animate-shimmer rounded"></div>
+              <div className="h-4 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 dark:from-blue-800 dark:via-purple-800 dark:to-blue-800 bg-[length:200%_100%] animate-shimmer rounded w-5/6"></div>
+              <div className="h-4 bg-gradient-to-r from-blue-200 via-purple-200 to-blue-200 dark:from-blue-800 dark:via-purple-800 dark:to-blue-800 bg-[length:200%_100%] animate-shimmer rounded w-4/6"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+              {/* 左侧：AI 生成的内容 (2/3 宽度) */}
+              <div className="lg:col-span-2">
                 <Response 
                   onCitationClick={(num) => {
                     // 自动展开 Sources 并滚动到对应的来源
@@ -198,9 +199,9 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
                       const sourceElement = document.querySelector(`[data-source-number="${num}"]`);
                       sourceElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                       // 高亮效果
-                      sourceElement?.classList.add('ring-2', 'ring-blue-500');
+                      sourceElement?.classList.add('ring-2', 'ring-blue-500', 'dark:ring-blue-400');
                       setTimeout(() => {
-                        sourceElement?.classList.remove('ring-2', 'ring-blue-500');
+                        sourceElement?.classList.remove('ring-2', 'ring-blue-500', 'dark:ring-blue-400');
                       }, 2000);
                     }, 100);
                   }}
@@ -219,48 +220,81 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
                     AI responses may include mistakes.
                   </p>
                 )}
+              </div>
 
-                {/* Sources Section */}
-                {showSources && !isLoading && results.length > 0 && (
-                  <div className="mt-6 pt-4 border-t border-blue-200 dark:border-blue-800 animate-fade-in">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      Sources ({Math.min(results.length, 10)})
-                    </h4>
-                    <div className="space-y-2">
-                      {results.slice(0, 10).map((result, index) => (
-                        <a
-                          key={index}
-                          href={result.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          data-source-number={index + 1}
-                          className="flex items-start gap-3 p-3 rounded-lg bg-white/60 dark:bg-gray-900/40 hover:bg-white dark:hover:bg-gray-900/60 border border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200 group"
-                        >
-                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-400 line-clamp-1">
-                              {result.title}
-                            </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">
-                              {result.displayLink}
-                            </p>
-                          </div>
-                          <svg className="flex-shrink-0 w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                      ))}
+              {/* 右侧：Sources (1/3 宽度，可滚动) */}
+              {showSources && !isLoading && results.length > 0 && (
+                <div className="lg:col-span-1">
+                  <div className="sticky top-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        Sources
+                      </h4>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {Math.min(results.length, 10)}
+                      </span>
+                    </div>
+                    <div className="max-h-[600px] overflow-y-auto overflow-x-hidden pr-1 space-y-2 scrollbar-thin scrollbar-thumb-blue-200 dark:scrollbar-thumb-blue-800 scrollbar-track-transparent">
+                      {results.slice(0, 10).map((result, index) => {
+                        // 提取域名用于获取 favicon
+                        const getDomain = (url: string) => {
+                          try {
+                            const urlObj = new URL(url);
+                            return urlObj.hostname;
+                          } catch {
+                            return result.displayLink || '';
+                          }
+                        };
+                        const domain = getDomain(result.link);
+                        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+
+                        return (
+                          <a
+                            key={index}
+                            href={result.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-source-number={index + 1}
+                            className="flex items-start gap-2 p-2.5 rounded-lg bg-white/60 dark:bg-gray-900/40 hover:bg-white dark:hover:bg-gray-900/60 border border-blue-100/50 dark:border-blue-900/50 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-sm transition-all duration-200 group block"
+                          >
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                              {index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0 flex items-start gap-2">
+                              {/* 网站图标 */}
+                              <img
+                                src={faviconUrl}
+                                alt=""
+                                className="w-4 h-4 rounded flex-shrink-0 mt-0.5"
+                                onError={(e) => {
+                                  // 如果图标加载失败，显示默认图标
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-400 line-clamp-2 leading-tight">
+                                  {result.title}
+                                </p>
+                                <p className="text-[10px] text-gray-600 dark:text-gray-400 truncate mt-1">
+                                  {result.displayLink}
+                                </p>
+                              </div>
+                            </div>
+                            <svg className="flex-shrink-0 w-3 h-3 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        );
+                      })}
                     </div>
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

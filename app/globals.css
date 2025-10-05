@@ -52,6 +52,32 @@
   background: #9ca3af;
 }
 
+/* 细滚动条（用于 Sources 侧边栏） */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #bfdbfe;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #93c5fd;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #1e3a8a;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #1e40af;
+}
+
 /* 平滑滚动 */
 html {
   scroll-behavior: smooth;
