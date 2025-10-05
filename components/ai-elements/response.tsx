@@ -1,19 +1,13 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { type ComponentProps, memo } from "react";
 import { Streamdown } from "streamdown";
 
 type ResponseProps = ComponentProps<typeof Streamdown>;
 
 export const Response = memo(
-  ({ className, ...props }: ResponseProps) => (
+  (props: ResponseProps) => (
     <Streamdown
-      className={cn(
-        "streamdown-content",
-        "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
-        className
-      )}
       parseIncompleteMarkdown={true}
       {...props}
     />

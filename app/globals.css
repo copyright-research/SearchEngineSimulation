@@ -1,9 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Streamdown styles - required for markdown rendering */
-@source "../../node_modules/streamdown/dist/index.js";
-
 @custom-variant dark (&:is(.dark *));
 
 /* 淡入动画 */
