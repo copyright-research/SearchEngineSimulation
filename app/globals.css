@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* 让 Tailwind 扫描 streamdown 包中的类名 */
+@source "../node_modules/streamdown/dist/index.js";
+
 @custom-variant dark (&:is(.dark *));
 
 /* 淡入动画 */
