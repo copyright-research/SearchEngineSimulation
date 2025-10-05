@@ -19,7 +19,11 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (results.length === 0) return;
+    // 验证数据有效性
+    if (!query || !query.trim() || results.length === 0) {
+      console.log('Skipping overview: invalid data', { query: !!query, resultsCount: results.length });
+      return;
+    }
 
     // 取消之前的请求
     if (abortControllerRef.current) {
@@ -35,15 +39,36 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
       setCompletion('');
 
       try {
+        // 准备请求数据
+        const requestData = {
+          query: query.trim(),
+          results: results
+        };
+
+        console.log('Sending overview request:', { 
+          query: requestData.query, 
+          resultsCount: requestData.results.length 
+        });
+
         const response = await fetch('/api/overview', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, results: results.slice(0, 5) }),
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
+          body: JSON.stringify(requestData),
           signal: abortController.signal,
         });
 
-        if (!response.ok) throw new Error('Failed to generate overview');
-        if (!response.body) throw new Error('No response body');
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Overview API error:', response.status, errorText);
+          throw new Error(`Failed to generate overview: ${response.status}`);
+        }
+
+        if (!response.body) {
+          throw new Error('No response body');
+        }
 
         // 使用 AI SDK 的流式读取
         const reader = response.body.getReader();
@@ -58,8 +83,13 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
         }
 
         setIsLoading(false);
+        console.log('Overview generation completed');
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return;
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log('Overview request aborted');
+          return;
+        }
+        console.error('Overview generation error:', err);
         setError(err instanceof Error ? err : new Error('Unknown error'));
         setIsLoading(false);
       }
@@ -160,7 +190,23 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
               </div>
             ) : (
               <>
-                <Response>{completion}</Response>
+                <Response 
+                  onCitationClick={(num) => {
+                    // 自动展开 Sources 并滚动到对应的来源
+                    setShowSources(true);
+                    setTimeout(() => {
+                      const sourceElement = document.querySelector(`[data-source-number="${num}"]`);
+                      sourceElement?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      // 高亮效果
+                      sourceElement?.classList.add('ring-2', 'ring-blue-500');
+                      setTimeout(() => {
+                        sourceElement?.classList.remove('ring-2', 'ring-blue-500');
+                      }, 2000);
+                    }, 100);
+                  }}
+                >
+                  {completion}
+                </Response>
                 {isLoading && (
                   <span className="inline-flex items-center ml-2 align-middle">
                     <Loader size={14} className="text-blue-600 dark:text-blue-400" />
@@ -181,15 +227,16 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                       </svg>
-                      Sources
+                      Sources ({Math.min(results.length, 10)})
                     </h4>
                     <div className="space-y-2">
-                      {results.slice(0, 5).map((result, index) => (
+                      {results.slice(0, 10).map((result, index) => (
                         <a
                           key={index}
                           href={result.link}
                           target="_blank"
                           rel="noopener noreferrer"
+                          data-source-number={index + 1}
                           className="flex items-start gap-3 p-3 rounded-lg bg-white/60 dark:bg-gray-900/40 hover:bg-white dark:hover:bg-gray-900/60 border border-transparent hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-200 group"
                         >
                           <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold flex items-center justify-center">

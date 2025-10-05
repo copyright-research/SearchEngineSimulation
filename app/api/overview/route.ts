@@ -6,15 +6,36 @@ import { streamText } from 'ai';
 
 export async function POST(req: Request) {
   try {
-    const { query, results } = await req.json();
+    // 检查请求体是否存在
+    const contentType = req.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Invalid content type:', contentType);
+      return new Response('Content-Type must be application/json', { status: 400 });
+    }
+
+    // 尝试读取请求体
+    let body;
+    try {
+      const text = await req.text();
+      if (!text || text.trim() === '') {
+        console.error('Empty request body');
+        return new Response('Request body is empty', { status: 400 });
+      }
+      body = JSON.parse(text);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return new Response('Invalid JSON in request body', { status: 400 });
+    }
+
+    const { query, results } = body;
 
     if (!query || !results || results.length === 0) {
-      return new Response('Invalid request', { status: 400 });
+      console.error('Invalid request data:', { query: !!query, resultsLength: results?.length });
+      return new Response('Invalid request: missing query or results', { status: 400 });
     }
 
     // 构建上下文：从搜索结果中提取信息
     const context = results
-      .slice(0, 5) // 只使用前 5 条结果
       .map((result: any, index: number) => {
         return `[${index + 1}] ${result.title}\n${result.snippet}\nSource: ${result.displayLink}`;
       })
@@ -40,6 +61,7 @@ Important rules:
 - Use markdown bullet points syntax for the Key Details section
 - Keep the tone informative and conversational
 - Be concise but comprehensive
+- Synthesize information from multiple sources when possible
 - Do NOT make up information - only use what's in the search results
 - Do NOT include the source URLs in your response (they will be added separately)
 
