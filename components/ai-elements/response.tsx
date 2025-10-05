@@ -4,13 +4,13 @@ import { type ComponentProps, memo } from "react";
 import { Streamdown } from "streamdown";
 
 type ResponseProps = ComponentProps<typeof Streamdown> & {
-  onCitationClick?: (citationNumber: number) => void;
+  onCitationClick?: (citationNumbers: number[]) => void;
 };
 
 // 处理引用的通用函数
 const processText = (
   text: string,
-  onCitationClick?: (citationNumber: number) => void
+  onCitationClick?: (citationNumbers: number[]) => void
 ) => {
   // 匹配 [1], [1, 2], [1, 2, 3] 等格式
   const citationRegex = /\[(\d+(?:,\s*\d+)*)\]/g;
@@ -27,26 +27,22 @@ const processText = (
     // 解析引用数字
     const numbers = match[1].split(',').map(n => parseInt(n.trim()));
     
-    // 添加引用元素
+    // 添加引用元素 - 只显示链接图标
     parts.push(
       <sup
         key={match.index}
-        className="inline-flex items-center gap-0.5 ml-0.5"
+        className="inline-flex items-center ml-0.5"
       >
-        {numbers.map((num, idx) => (
-          <span key={num} className="inline-flex items-center">
-            <button
-              onClick={() => onCitationClick?.(num)}
-              className="relative inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 rounded border border-blue-200 dark:border-blue-800 transition-all duration-150 hover:scale-110 hover:shadow-sm"
-              aria-label={`Citation ${num}`}
-            >
-              {num}
-            </button>
-            {idx < numbers.length - 1 && (
-              <span className="text-gray-400 dark:text-gray-500 text-[10px] mx-0.5">,</span>
-            )}
-          </span>
-        ))}
+        <button
+          onClick={() => onCitationClick?.(numbers)}
+          className="relative inline-flex items-center justify-center w-4 h-4 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 hover:bg-blue-100 dark:hover:bg-blue-900 rounded border border-blue-200 dark:border-blue-800 transition-all duration-150 hover:scale-110 hover:shadow-sm"
+          aria-label={`Citations ${numbers.join(', ')}`}
+          title={`Sources: ${numbers.join(', ')}`}
+        >
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+        </button>
       </sup>
     );
 
@@ -64,7 +60,7 @@ const processText = (
 // 递归处理子节点
 const processChildren = (
   node: React.ReactNode,
-  onCitationClick?: (citationNumber: number) => void
+  onCitationClick?: (citationNumbers: number[]) => void
 ): React.ReactNode => {
   if (typeof node === 'string') {
     return processText(node, onCitationClick);
@@ -85,7 +81,7 @@ const CustomParagraph = ({
   onCitationClick 
 }: { 
   children: React.ReactNode;
-  onCitationClick?: (citationNumber: number) => void;
+  onCitationClick?: (citationNumbers: number[]) => void;
 }) => {
   return <p>{processChildren(children, onCitationClick)}</p>;
 };
@@ -96,7 +92,7 @@ const CustomListItem = ({
   onCitationClick 
 }: { 
   children: React.ReactNode;
-  onCitationClick?: (citationNumber: number) => void;
+  onCitationClick?: (citationNumbers: number[]) => void;
 }) => {
   return <li>{processChildren(children, onCitationClick)}</li>;
 };

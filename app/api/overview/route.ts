@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     // 构建上下文：从搜索结果中提取信息
     const context = results
-      .map((result: any, index: number) => {
+      .map((result: { title: string; snippet: string; displayLink: string }, index: number) => {
         return `[${index + 1}] ${result.title}\n${result.snippet}\nSource: ${result.displayLink}`;
       })
       .join('\n\n');
