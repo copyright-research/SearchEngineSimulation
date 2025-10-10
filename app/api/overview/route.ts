@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 
 // Removed edge runtime as it's not compatible with the AI SDK
@@ -100,7 +100,7 @@ STRUCTURE REQUIREMENTS:
 Overview:`;
 
     const result = streamText({
-      model: google('gemini-2.5-flash'),
+      model: groq('llama-3.3-70b-versatile'),
       prompt,
       temperature: 0.7,
     });

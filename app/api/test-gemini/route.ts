@@ -9,7 +9,7 @@ export async function POST(req: Request) {
       return new Response('Prompt is required', { status: 400 });
     }
 
-    console.log('=== Gemini Request ===');
+    console.log('====== Request ======');
     console.log('Prompt:', prompt);
     console.log('=====================');
 
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       prompt,
       temperature: 0.7,
       onFinish: ({ text, finishReason, usage }) => {
-        console.log('=== Gemini Response ===');
+        console.log('====== Response ======');
         console.log('Finish Reason:', finishReason);
         console.log('Usage:', usage);
         console.log('Full Text:', text);

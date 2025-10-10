@@ -1,4 +1,4 @@
-# Copyright Search 🔍
+# ReSearch 🔍
 
 A modern, fast, and elegant search engine powered by Google Custom Search API, built with Next.js 15.
 

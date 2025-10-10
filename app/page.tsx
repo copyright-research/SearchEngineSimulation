@@ -60,7 +60,7 @@ export default function Home() {
         <header className={`transition-all duration-500 ${hasSearched ? 'pt-8 pb-6' : 'pt-32 pb-12'}`}>
           <div className="text-center mb-8">
             <h1 className={`font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 transition-all duration-500 ${hasSearched ? 'text-3xl' : 'text-6xl'}`}>
-              Copyright Search
+              ReSearch
             </h1>
             {!hasSearched && (
               <p className="mt-4 text-gray-600 text-lg animate-fade-in">
