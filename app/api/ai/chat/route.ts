@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     // 从 parts 中提取文本
     const query = lastMessage.parts
       .filter((part) => part.type === 'text')
-      .map((part: any) => part.text)
+      .map((part) => ('text' in part ? part.text : ''))
       .join('');
 
     if (!query || query.trim().length === 0) {
