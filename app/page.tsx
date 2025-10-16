@@ -59,9 +59,19 @@ export default function Home() {
         {/* Header */}
         <header className={`transition-all duration-500 ${hasSearched ? 'pt-8 pb-6' : 'pt-32 pb-12'}`}>
           <div className="text-center mb-8">
-            <h1 className={`font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 transition-all duration-500 ${hasSearched ? 'text-3xl' : 'text-6xl'}`}>
-              ReSearch
-            </h1>
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <h1 className={`font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 transition-all duration-500 ${hasSearched ? 'text-3xl' : 'text-6xl'}`}>
+                ReSearch
+              </h1>
+              {!hasSearched && (
+                <a
+                  href="/ai"
+                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-105"
+                >
+                  Try AI Mode
+                </a>
+              )}
+            </div>
             {!hasSearched && (
               <p className="mt-4 text-gray-600 text-lg animate-fade-in">
                 Fast, accurate, and elegant search experience
