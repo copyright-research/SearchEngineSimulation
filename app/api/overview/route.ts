@@ -1,12 +1,44 @@
 import { groq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
+import { NextRequest } from 'next/server';
+import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 // Removed edge runtime as it's not compatible with the AI SDK
 // export const runtime = 'edge';
 
-export async function POST(req: Request) {
+// Rate limiter: 每个 IP 每小时最多 30 次请求（比 chat 多一些，因为更轻量）
+const overviewLimiter = rateLimit({
+  interval: 60 * 60 * 1000, // 1 小时
+  maxRequests: 30,
+});
+
+export async function POST(req: NextRequest) {
   try {
-    // 检查请求体是否存在
+    // 1. Rate limiting 检查
+    const clientIp = getClientIp(req);
+    const rateLimitCheck = overviewLimiter.check(clientIp);
+
+    if (!rateLimitCheck.success) {
+      const resetDate = new Date(rateLimitCheck.resetTime);
+      return new Response(
+        JSON.stringify({
+          error: 'Too many requests. Please try again later.',
+          resetAt: resetDate.toISOString(),
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-RateLimit-Limit': '30',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': resetDate.toISOString(),
+            'Retry-After': Math.ceil((rateLimitCheck.resetTime - Date.now()) / 1000).toString(),
+          },
+        }
+      );
+    }
+
+    // 2. 检查请求体是否存在
     const contentType = req.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       console.error('Invalid content type:', contentType);
@@ -105,7 +137,13 @@ Overview:`;
       temperature: 0.7,
     });
 
-    return result.toTextStreamResponse();
+    return result.toTextStreamResponse({
+      headers: {
+        'X-RateLimit-Limit': '30',
+        'X-RateLimit-Remaining': rateLimitCheck.remaining.toString(),
+        'X-RateLimit-Reset': new Date(rateLimitCheck.resetTime).toISOString(),
+      },
+    });
   } catch (error) {
     console.error('AI Overview error:', error);
     return new Response('Error generating overview', { status: 500 });

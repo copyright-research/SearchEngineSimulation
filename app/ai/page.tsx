@@ -230,7 +230,7 @@ export default function AIModePage() {
                                 </div>
                                 <div>
                                   <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Answer</h4>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400">Powered by Google AI</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">Powered by Groq AI</p>
                                 </div>
                               </div>
                               

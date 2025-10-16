@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 import { streamText, UIMessage, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
@@ -138,9 +138,9 @@ Please provide a brief answer based on general knowledge, but clearly mention th
     // 将 UIMessage 转换为 ModelMessage
     const modelMessages = convertToModelMessages(messages);
 
-    // 5. 调用 Google AI 生成回答
+    // 5. 调用 Groq AI 生成回答
     const result = streamText({
-      model: google('gemini-2.0-flash-exp'),
+      model: groq('llama-3.3-70b-versatile'),
       system: systemPrompt,
       messages: modelMessages,
       temperature: 0.7,
