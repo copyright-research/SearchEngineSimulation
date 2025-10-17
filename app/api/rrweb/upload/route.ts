@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
-import type { eventWithTime } from '@rrweb/types';
 
 /**
  * 上传 rrweb 录制的增量事件

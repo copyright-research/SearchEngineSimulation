@@ -1,11 +1,31 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 import rrwebPlayer from 'rrweb-player';
 import 'rrweb-player/dist/style.css';
 import type { eventWithTime } from '@rrweb/types';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RRWebAnalyzer } from '@/lib/rrweb-analyzer';
+import type { ColDef, ICellRendererParams } from 'ag-grid-community';
+
+// 注册 AG Grid 模块
+ModuleRegistry.registerModules([AllCommunityModule]);
+
+export const dynamic = 'force-dynamic';
+
+interface RecordingInfo {
+  recordingId: string;
+  sessionId: string;
+  chunksCount: number;
+  hasMerged: boolean;
+  firstChunkTime?: string;
+  lastChunkTime?: string;
+}
 
 interface RecordingData {
   recordingId: string;
@@ -20,120 +40,86 @@ interface RecordingData {
 }
 
 export default function ReplayPage() {
+  const [recordings, setRecordings] = useState<RecordingInfo[]>([]);
+  const [selectedRecording, setSelectedRecording] = useState<RecordingInfo | null>(null);
   const [recordingData, setRecordingData] = useState<RecordingData | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const [loadingList, setLoadingList] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisReport, setAnalysisReport] = useState<string>('');
+  const [leftWidth, setLeftWidth] = useState(50); // 左侧宽度百分比
+  const [isResizing, setIsResizing] = useState(false);
+  
   const playerContainerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const playerInstanceRef = useRef<any>(null);
+  const playerInstanceRef = useRef<InstanceType<typeof rrwebPlayer> | null>(null);
+  const router = useRouter();
 
-  // 加载录制文件
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // 加载录制列表
+  useEffect(() => {
+    loadRecordingsList();
+  }, []);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string) as RecordingData;
-        setRecordingData(data);
-        setError(null);
-        console.log(`[rrweb] Loaded ${data.events.length} events`);
-      } catch (err) {
-        setError('Failed to parse recording file');
-        console.error('[rrweb] Parse error:', err);
+  const loadRecordingsList = async () => {
+    try {
+      setLoadingList(true);
+      const response = await fetch('/api/rrweb/list');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch recordings list');
       }
-    };
-    reader.readAsText(file);
+
+      const data = await response.json();
+      setRecordings(data.recordings || []);
+    } catch (err) {
+      console.error('[rrweb] List error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load recordings');
+    } finally {
+      setLoadingList(false);
+    }
   };
 
-  const [sessions, setSessions] = useState<string[]>([]);
-
-  // 从 Vercel Blob 加载录制
-  const handleLoadFromBlob = async (recordingId: string, sessionId?: string) => {
-    if (!recordingId.trim()) {
-      setError('Please enter a Recording ID');
-      return;
-    }
-
+  // 加载选中的录制
+  const loadRecording = async (recording: RecordingInfo) => {
     setLoading(true);
     setError(null);
-    setSessions([]);
+    setSelectedRecording(recording);
+    setRecordingData(null);
 
     try {
-      // 如果没有 sessionId，先获取所有 sessions
-      if (!sessionId) {
-        setLoadingMessage('Fetching sessions...');
-        const response = await fetch(`/api/rrweb/upload?recordingId=${encodeURIComponent(recordingId)}`);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch recording');
-        }
-
-        const result = await response.json();
-        console.log('[rrweb] Fetch result:', result);
-
-        if (result.type === 'sessions') {
-          // 返回了多个 sessions，让用户选择
-          setSessions(result.sessions);
-          setLoadingMessage('');
-          setLoading(false);
-          return;
-        }
-      }
-
-      // 加载特定 session 的数据
-      setLoadingMessage('Loading session data...');
       const response = await fetch(
-        `/api/rrweb/upload?recordingId=${encodeURIComponent(recordingId)}&sessionId=${encodeURIComponent(sessionId || '')}`
+        `/api/rrweb/upload?recordingId=${encodeURIComponent(recording.recordingId)}&sessionId=${encodeURIComponent(recording.sessionId)}`
       );
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch session');
+        throw new Error('Failed to fetch recording');
       }
 
       const result = await response.json();
       let allEvents: eventWithTime[] = [];
 
       if (result.type === 'merged') {
-        // 加载合并后的文件
-        setLoadingMessage('Loading merged recording...');
         const mergedResponse = await fetch(result.url);
         const mergedData = await mergedResponse.json();
         allEvents = mergedData.events;
-        console.log(`[rrweb] Loaded merged file with ${allEvents.length} events`);
       } else if (result.type === 'chunks') {
-        // 加载多个 chunks 并合并
-        setLoadingMessage(`Loading ${result.count} chunks...`);
         const chunkPromises = result.urls.map(async (url: string) => {
           const chunkResponse = await fetch(url);
           const chunkData = await chunkResponse.json();
           return chunkData.events as eventWithTime[];
         });
-
         const chunksArrays = await Promise.all(chunkPromises);
         allEvents = chunksArrays.flat();
-        console.log(`[rrweb] Loaded ${result.count} chunks with ${allEvents.length} total events`);
       }
 
-      // 构建 RecordingData
-      const recordingData: RecordingData = {
-        recordingId,
+      const data: RecordingData = {
+        recordingId: recording.recordingId,
         timestamp: new Date().toISOString(),
         events: allEvents,
       };
 
-      setRecordingData(recordingData);
+      setRecordingData(data);
       setError(null);
-      setLoadingMessage('');
-      setSessions([]);
-      console.log(`[rrweb] Successfully loaded recording: ${recordingId}/${sessionId}`);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load recording');
       console.error('[rrweb] Load error:', err);
@@ -142,53 +128,39 @@ export default function ReplayPage() {
     }
   };
 
-  // 初始化 rrweb-player (更好的 UI 和自动处理缩放)
+  // 初始化播放器
   useEffect(() => {
     if (!recordingData || !playerContainerRef.current) return;
 
-    // 清理旧的 player
+    const container = playerContainerRef.current;
+
     if (playerInstanceRef.current) {
-      try {
-        // rrweb-player 会自动清理
-        playerContainerRef.current.innerHTML = '';
-      } catch (err) {
-        console.error('[rrweb] Cleanup error:', err);
-      }
+      container.innerHTML = '';
     }
 
     try {
-      // 计算合适的播放器尺寸
-      const viewport = recordingData.metadata?.viewport;
-      let playerWidth = 1024;
-      let playerHeight = 768;
+      const viewport = recordingData.metadata?.viewport || { width: 1280, height: 720 };
+      const aspectRatio = viewport.width / viewport.height;
+      const maxWidth = 1400;
+      const playerWidth = Math.min(viewport.width, maxWidth);
+      const playerHeight = playerWidth / aspectRatio;
 
-      if (viewport) {
-        // 使用录制时的视口比例
-        const aspectRatio = viewport.width / viewport.height;
-        playerWidth = Math.min(viewport.width, 1400); // 最大 1400px
-        playerHeight = playerWidth / aspectRatio;
-      }
-
-      // 使用 rrweb-player 创建播放器
-      const player = new rrwebPlayer({
-        target: playerContainerRef.current,
+      playerInstanceRef.current = new rrwebPlayer({
+        target: container,
         props: {
           events: recordingData.events,
           width: playerWidth,
           height: playerHeight,
           autoPlay: false,
-          showController: true,
           speedOption: [0.5, 1, 2, 4, 8],
-          // 传递给底层 Replayer 的选项
           skipInactive: true,
-          showWarning: false,
+          showController: true,
           mouseTail: {
             duration: 500,
             lineCap: 'round',
             lineWidth: 2,
             strokeStyle: 'red',
           },
-          // 重要：使用 insertStyleRules 修复 iframe 样式问题
           insertStyleRules: [
             'iframe { transform: none !important; }',
             '.replayer-wrapper { overflow: hidden !important; }',
@@ -196,25 +168,21 @@ export default function ReplayPage() {
         },
       });
 
-      playerInstanceRef.current = player;
-      console.log('[rrweb] Player initialized with size:', playerWidth, 'x', playerHeight);
+      console.log('[rrweb] Player initialized');
     } catch (err) {
       setError('Failed to initialize player');
       console.error('[rrweb] Player error:', err);
     }
 
     return () => {
-      if (playerInstanceRef.current) {
-        try {
-          playerInstanceRef.current = null;
-        } catch (err) {
-          console.error('[rrweb] Cleanup error:', err);
-        }
+      if (playerInstanceRef.current && container) {
+        container.innerHTML = '';
+        playerInstanceRef.current = null;
       }
     };
   }, [recordingData]);
 
-  // 分析录制内容
+  // 分析录制
   const handleAnalyze = () => {
     if (!recordingData) return;
 
@@ -234,18 +202,135 @@ export default function ReplayPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `rrweb-analysis-${recordingData?.recordingId}-${Date.now()}.txt`;
+    a.download = `rrweb-analysis-${selectedRecording?.recordingId}-${Date.now()}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
+  // 退出登录
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/replay/auth', { method: 'DELETE' });
+      router.push('/replay/login');
+    } catch (err) {
+      console.error('Sign out failed:', err);
+    }
+  };
+
+  // 处理拖拽调整宽度
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const containerWidth = window.innerWidth;
+      const newLeftWidth = (e.clientX / containerWidth) * 100;
+      
+      // 限制在 20% 到 80% 之间
+      if (newLeftWidth >= 20 && newLeftWidth <= 80) {
+        setLeftWidth(newLeftWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  // AG Grid 列定义
+  const columnDefs: ColDef<RecordingInfo>[] = [
+    {
+      headerName: 'Recording ID',
+      field: 'recordingId',
+      flex: 2,
+      filter: 'agTextColumnFilter',
+    },
+    {
+      headerName: 'Session ID',
+      field: 'sessionId',
+      flex: 2,
+      filter: 'agTextColumnFilter',
+      cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
+        const SessionIdCell = () => (
+          <span className="font-mono text-xs">{params.value}</span>
+        );
+        return <SessionIdCell />;
+      },
+    },
+    {
+      headerName: 'Chunks',
+      field: 'chunksCount',
+      width: 100,
+      cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
+        const ChunksCell = () => (
+          <span className="text-center block">{params.value}</span>
+        );
+        return <ChunksCell />;
+      },
+    },
+    {
+      headerName: 'Status',
+      field: 'hasMerged',
+      width: 120,
+      cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
+        const StatusCell = () => {
+          const merged = params.value;
+          if (merged) {
+            return (
+              <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                Merged
+              </span>
+            );
+          }
+          return (
+            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+              Chunks
+            </span>
+          );
+        };
+        return <StatusCell />;
+      },
+    },
+    {
+      headerName: 'Created',
+      field: 'firstChunkTime',
+      flex: 1,
+      sort: 'desc',
+      cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
+        const DateCell = () => {
+          if (!params.value) return <>-</>;
+          return <>{new Date(params.value).toLocaleString()}</>;
+        };
+        return <DateCell />;
+      },
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link
@@ -257,15 +342,15 @@ export default function ReplayPage() {
                 </svg>
               </Link>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                rrweb Replay
+                rrweb Replay Dashboard
               </h1>
             </div>
 
             <div className="flex items-center gap-4">
-              {recordingData && (
+              {selectedRecording && (
                 <>
                   <div className="text-sm text-gray-600 dark:text-gray-400">
-                    <span className="font-medium">RID:</span> {recordingData.recordingId}
+                    <span className="font-medium">RID:</span> {selectedRecording.recordingId}
                   </div>
                   <button
                     onClick={handleAnalyze}
@@ -279,10 +364,7 @@ export default function ReplayPage() {
                 </>
               )}
               <button
-                onClick={async () => {
-                  await fetch('/api/replay/auth', { method: 'DELETE' });
-                  window.location.href = '/replay/login';
-                }}
+                onClick={handleSignOut}
                 className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors flex items-center gap-1"
                 title="Sign Out"
               >
@@ -296,234 +378,146 @@ export default function ReplayPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-        {!recordingData ? (
-          // 文件上传区域
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* 从 Blob 加载 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Load from Cloud
+      {/* Main Content: Left (Table) + Right (Player) */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Recordings List */}
+        <div 
+          className="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800"
+          style={{ width: `${leftWidth}%` }}
+        >
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Recordings {!loadingList && `(${recordings.length})`}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Enter the Recording ID (RID) to load from Vercel Blob storage.
-              </p>
-
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  placeholder="Enter Recording ID (e.g., session-123)"
-                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const input = e.currentTarget;
-                      handleLoadFromBlob(input.value);
-                    }
-                  }}
-                  id="rid-input"
-                />
-                <button
-                  onClick={() => {
-                    const input = document.getElementById('rid-input') as HTMLInputElement;
-                    if (input) {
-                      handleLoadFromBlob(input.value);
-                    }
-                  }}
-                  disabled={loading}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      Load
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {loading && loadingMessage && (
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-400 text-sm">
-                  {loadingMessage}
-                </div>
-              )}
-
-              {/* Sessions 列表 */}
-              {sessions.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                    Found {sessions.length} session(s). Select one to replay:
-                  </h3>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {sessions.map((sessionId) => (
-                      <button
-                        key={sessionId}
-                        onClick={() => {
-                          const input = document.getElementById('rid-input') as HTMLInputElement;
-                          if (input) {
-                            handleLoadFromBlob(input.value, sessionId);
-                          }
-                        }}
-                        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg text-left transition-colors border border-gray-200 dark:border-gray-600"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-mono text-sm text-gray-900 dark:text-gray-100">
-                              {sessionId}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {new Date(parseInt(sessionId.split('-')[0])).toLocaleString()}
-                            </div>
-                          </div>
-                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <button
+                onClick={loadRecordingsList}
+                disabled={loadingList}
+                className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors"
+              >
+                {loadingList ? 'Loading...' : 'Refresh'}
+              </button>
             </div>
-
-            {/* 从文件上传 */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Load from File
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Or upload a local rrweb recording JSON file.
-              </p>
-
-              <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-700 dark:bg-gray-900 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 transition-colors">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <svg className="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span className="font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    JSON file from rrweb recording
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".json"
-                  onChange={handleFileUpload}
-                />
-              </label>
-            </div>
-
-            {error && (
-              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <p className="font-medium">Error</p>
-                    <p className="text-sm mt-1">{error}</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-        ) : (
-          // 回放区域
-          <div className="space-y-4">
-            {/* 元数据信息 */}
-            {recordingData.metadata && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                  Recording Information
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-600 dark:text-gray-400">
-                  <div>
-                    <div className="font-medium">Recorded</div>
-                    <div>{new Date(recordingData.timestamp).toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium">Events</div>
-                    <div>{recordingData.events.length.toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium">Original Viewport</div>
-                    <div>{recordingData.metadata.viewport.width} × {recordingData.metadata.viewport.height}</div>
-                  </div>
-                  <div>
-                    <div className="font-medium">Screen</div>
-                    <div>{recordingData.metadata.screen.width} × {recordingData.metadata.screen.height}</div>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* 回放容器 - 使用 rrweb-player */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Session Replay
-                </h3>
-                <button
-                  onClick={() => {
-                    setRecordingData(null);
-                    setError(null);
-                    setShowAnalysis(false);
-                  }}
-                  className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg transition-colors"
-                >
-                  Load Another
-                </button>
+          <div className="flex-1 ag-theme-alpine">
+            <AgGridReact
+              rowData={recordings}
+              columnDefs={columnDefs}
+              defaultColDef={{
+                sortable: true,
+                resizable: true,
+              }}
+              rowSelection="single"
+              onRowClicked={(event) => {
+                if (event.data) {
+                  loadRecording(event.data);
+                }
+              }}
+              animateRows={true}
+              domLayout="normal"
+            />
+          </div>
+        </div>
+
+        {/* Resizable Divider */}
+        <div
+          className="w-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors relative group"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="absolute inset-y-0 -left-1 -right-1" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <svg className="w-4 h-4 text-blue-500 dark:text-blue-400" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8z"/>
+              <path d="M3 4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 4z"/>
+              <path d="M3 12a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 12z"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Right: Player */}
+        <div 
+          className="flex flex-col bg-gray-50 dark:bg-gray-900 overflow-auto"
+          style={{ width: `${100 - leftWidth}%` }}
+        >
+          {!selectedRecording && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Select a recording from the left to replay
+                </p>
               </div>
-              
-              {/* rrweb-player 会在这里渲染 */}
-              <div 
-                ref={playerContainerRef} 
-                className="flex justify-center"
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <svg className="w-12 h-12 mx-auto mb-4 text-blue-600 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <p className="text-gray-600 dark:text-gray-400">Loading recording...</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-4">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400">
+                {error}
+              </div>
+            </div>
+          )}
+
+          {recordingData && (
+            <div className="p-6 space-y-4">
+              <div
+                ref={playerContainerRef}
+                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden"
               />
             </div>
+          )}
+        </div>
+      </div>
 
-            {/* 分析报告 */}
-            {showAnalysis && analysisReport && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    📊 Analysis Report
-                  </h3>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={downloadAnalysis}
-                      className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                    >
-                      Download Report
-                    </button>
-                    <button
-                      onClick={() => setShowAnalysis(false)}
-                      className="px-3 py-1 text-sm bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-                <pre className="text-xs text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg overflow-auto max-h-[600px] whitespace-pre-wrap font-mono">
-                  {analysisReport}
-                </pre>
+      {/* Analysis Modal */}
+      {showAnalysis && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                Recording Analysis
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={downloadAnalysis}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Download
+                </button>
+                <button
+                  onClick={() => setShowAnalysis(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-            )}
+            </div>
+            <div className="p-6 overflow-auto flex-1">
+              <pre className="whitespace-pre-wrap text-sm font-mono text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900 p-4 rounded">
+                {analysisReport}
+              </pre>
+            </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   );
 }

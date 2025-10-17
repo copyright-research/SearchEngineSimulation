@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { list, put, del } from '@vercel/blob';
+import { list, put } from '@vercel/blob';
 import type { eventWithTime } from '@rrweb/types';
 
 /**

@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import SearchBar from '@/components/SearchBar';
 import SearchResults from '@/components/SearchResults';
 import AIOverview from '@/components/AIOverview';
 import type { GoogleSearchResponse, SearchResult } from '@/types/search';
+import { RRWebRecorder } from '@/components/RRWebRecorder';
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +19,19 @@ export default function Home() {
   }>({});
   const [hasSearched, setHasSearched] = useState(false);
   const [currentQuery, setCurrentQuery] = useState('');
+  
+  // 从 URL 参数读取是否显示 AI Overview，默认显示
+  const [showAIOverview, setShowAIOverview] = useState(true);
+  
+  useEffect(() => {
+    const aiParam = searchParams.get('ai');
+    // ai=0 或 ai=false 时隐藏，其他情况（包括未设置）都显示
+    if (aiParam === '0' || aiParam === 'false') {
+      setShowAIOverview(false);
+    } else {
+      setShowAIOverview(true);
+    }
+  }, [searchParams]);
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
@@ -83,7 +99,7 @@ export default function Home() {
         </header>
 
         {/* AI Overview */}
-        {hasSearched && !isLoading && !error && results.length > 0 && (
+        {showAIOverview && hasSearched && !isLoading && !error && results.length > 0 && (
           <AIOverview query={currentQuery} results={results} />
         )}
 
@@ -107,6 +123,21 @@ export default function Home() {
           </footer>
         )}
       </main>
+      
+      {/* rrweb 录屏 */}
+      <RRWebRecorder />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }

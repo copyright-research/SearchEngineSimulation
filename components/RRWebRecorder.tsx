@@ -12,7 +12,7 @@ export function RRWebRecorder() {
     if (typeof window === 'undefined') return;
 
     const params = new URLSearchParams(window.location.search);
-    const rid = params.get('RID');
+    const rid = params.get('rid');
 
     if (rid) {
       setRecordingId(rid);

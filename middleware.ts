@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
   // 2. 强制要求 / 和 /ai 必须带上 RID 参数
   const requireRIDPaths = ['/', '/ai'];
   if (requireRIDPaths.includes(request.nextUrl.pathname)) {
-    const rid = request.nextUrl.searchParams.get('RID');
+    const rid = request.nextUrl.searchParams.get('rid');
     
     if (!rid) {
       // 没有 RID，返回 403 或重定向到提示页面
@@ -124,7 +124,7 @@ export function middleware(request: NextRequest) {
               Please include it in the URL.
             </p>
             <div class="example">
-              ${request.nextUrl.pathname}?<span class="highlight">RID=session-001</span>
+              ${request.nextUrl.pathname}?<span class="highlight">rid=session-001</span>
             </div>
             <p style="font-size: 14px; color: #718096;">
               Example: Use any unique identifier like "test-001", "user-session", etc.
