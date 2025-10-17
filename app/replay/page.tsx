@@ -197,9 +197,12 @@ export default function ReplayPage() {
   useEffect(() => {
     initializePlayer();
 
+    // 捕获当前的 ref 值用于 cleanup
+    const currentContainer = playerContainerRef.current;
+
     return () => {
-      if (playerInstanceRef.current && playerContainerRef.current) {
-        playerContainerRef.current.innerHTML = '';
+      if (playerInstanceRef.current && currentContainer) {
+        currentContainer.innerHTML = '';
         playerInstanceRef.current = null;
       }
     };
