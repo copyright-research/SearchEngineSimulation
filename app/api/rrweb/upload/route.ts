@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
+import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 /**
  * 上传 rrweb 录制的增量事件
@@ -72,8 +73,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const recordingId = searchParams.get('recordingId');
-    const sessionId = searchParams.get('sessionId');
+    const recordingId = getParamCaseInsensitive(searchParams, 'recordingId');
+    const sessionId = getParamCaseInsensitive(searchParams, 'sessionId');
 
     if (!recordingId) {
       return NextResponse.json(

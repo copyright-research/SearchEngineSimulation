@@ -53,7 +53,7 @@ export default function ReplayPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisReport, setAnalysisReport] = useState<string>('');
-  const [leftWidth, setLeftWidth] = useState(50); // 左侧宽度百分比
+  const [leftWidth, setLeftWidth] = useState(30); // 左侧宽度百分比
   const [isResizing, setIsResizing] = useState(false);
   
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -213,8 +213,8 @@ export default function ReplayPage() {
     if (!recordingData) return;
 
     const analyzer = new RRWebAnalyzer(recordingData.events);
-    const analysis = analyzer.analyze();
-    const report = analyzer.generateReport(analysis);
+    const analysis = analyzer.analyzeComplete(); // 使用完整分析
+    const report = analyzer.generateCompleteReport(analysis); // 生成完整报告
     
     setAnalysisReport(report);
     setShowAnalysis(true);
@@ -300,7 +300,7 @@ export default function ReplayPage() {
     {
       headerName: 'Session ID',
       field: 'sessionId',
-      flex: 2,
+      flex: 1,
       filter: 'agTextColumnFilter',
       cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
         const SessionIdCell = () => (
@@ -309,40 +309,40 @@ export default function ReplayPage() {
         return <SessionIdCell />;
       },
     },
-    {
-      headerName: 'Chunks',
-      field: 'chunksCount',
-      width: 100,
-      cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
-        const ChunksCell = () => (
-          <span className="text-center block">{params.value}</span>
-        );
-        return <ChunksCell />;
-      },
-    },
-    {
-      headerName: 'Status',
-      field: 'hasMerged',
-      width: 120,
-      cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
-        const StatusCell = () => {
-          const merged = params.value;
-          if (merged) {
-            return (
-              <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                Merged
-              </span>
-            );
-          }
-          return (
-            <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
-              Chunks
-            </span>
-          );
-        };
-        return <StatusCell />;
-      },
-    },
+    // {
+    //   headerName: 'Chunks',
+    //   field: 'chunksCount',
+    //   width: 100,
+    //   cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
+    //     const ChunksCell = () => (
+    //       <span className="text-center block">{params.value}</span>
+    //     );
+    //     return <ChunksCell />;
+    //   },
+    // },
+    // {
+    //   headerName: 'Status',
+    //   field: 'hasMerged',
+    //   width: 120,
+    //   cellRenderer: (params: ICellRendererParams<RecordingInfo>) => {
+    //     const StatusCell = () => {
+    //       const merged = params.value;
+    //       if (merged) {
+    //         return (
+    //           <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+    //             Merged
+    //           </span>
+    //         );
+    //       }
+    //       return (
+    //         <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+    //           Chunks
+    //         </span>
+    //       );
+    //     };
+    //     return <StatusCell />;
+    //   },
+    // },
     {
       headerName: 'Created',
       field: 'firstChunkTime',

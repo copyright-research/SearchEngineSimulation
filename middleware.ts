@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 // 检查是否已经通过认证（通过 Cookie）
 function isAuthenticated(request: NextRequest): boolean {
@@ -34,10 +35,10 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 2. 强制要求 / 和 /ai 必须带上 RID 参数
+  // 2. 强制要求 / 和 /ai 必须带上 RID 参数（大小写不敏感）
   const requireRIDPaths = ['/', '/ai'];
   if (requireRIDPaths.includes(request.nextUrl.pathname)) {
-    const rid = request.nextUrl.searchParams.get('rid');
+    const rid = getParamCaseInsensitive(request.nextUrl.searchParams, 'rid');
     
     if (!rid) {
       // 没有 RID，返回 403 或重定向到提示页面

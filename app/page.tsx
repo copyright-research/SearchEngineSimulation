@@ -24,7 +24,14 @@ function HomeContent() {
   const [showAIOverview, setShowAIOverview] = useState(true);
   
   useEffect(() => {
-    const aiParam = searchParams.get('ai');
+    // 大小写不敏感获取 ai 参数
+    let aiParam: string | null = null;
+    for (const [key, value] of searchParams.entries()) {
+      if (key.toLowerCase() === 'ai') {
+        aiParam = value;
+        break;
+      }
+    }
     // ai=0 或 ai=false 时隐藏，其他情况（包括未设置）都显示
     if (aiParam === '0' || aiParam === 'false') {
       setShowAIOverview(false);

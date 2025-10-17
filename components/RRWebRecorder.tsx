@@ -1,18 +1,20 @@
 'use client';
 
 import { useRRWebRecorder } from '@/lib/use-rrweb-recorder';
+import { getUrlParamCaseInsensitive } from '@/lib/url-utils';
 import { useEffect, useState } from 'react';
 
 export function RRWebRecorder() {
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const isDebug = getUrlParamCaseInsensitive('debug') === 'true';
 
-  // 从 URL 参数中获取 RID
+
+  // 从 URL 参数中获取 RID（大小写不敏感）
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const params = new URLSearchParams(window.location.search);
-    const rid = params.get('rid');
+    const rid = getUrlParamCaseInsensitive('rid');
 
     if (rid) {
       setRecordingId(rid);
@@ -35,7 +37,7 @@ export function RRWebRecorder() {
   });
 
   // 如果没有启用录制，不显示任何 UI
-  if (!enabled || !recordingId) {
+  if (!enabled || !recordingId || !isDebug) {
     return null;
   }
 
