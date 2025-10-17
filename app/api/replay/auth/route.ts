@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       return response;
       } else {
         // 密码错误
+        console.log({correctPassword, password})
         return NextResponse.json(
         { error: 'Invalid password' },
         { status: 401 }

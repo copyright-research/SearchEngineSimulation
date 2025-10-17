@@ -21,7 +21,15 @@ export function RRWebRecorder() {
     }
   }, []);
 
-  const { isRecording, eventsCount, downloadRecording, clearRecording } = useRRWebRecorder({
+  const { 
+    isRecording, 
+    eventsCount, 
+    uploadedCount,
+    uploadStatus,
+    downloadRecording, 
+    clearRecording,
+    manualUpload,
+  } = useRRWebRecorder({
     enabled,
     recordingId: recordingId || undefined,
   });
@@ -46,10 +54,40 @@ export function RRWebRecorder() {
         <div className="text-[10px] text-gray-400 space-y-0.5 mb-3">
           <div>RID: {recordingId}</div>
           <div>Events: {eventsCount.toLocaleString()}</div>
+          <div className="flex items-center gap-1">
+            <span>Uploaded: {uploadedCount.toLocaleString()}</span>
+            {uploadStatus === 'uploading' && (
+              <svg className="w-3 h-3 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            )}
+            {uploadStatus === 'success' && (
+              <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {uploadStatus === 'error' && (
+              <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+          </div>
         </div>
 
         {/* 操作按钮 */}
         <div className="flex flex-col gap-1.5">
+          <button
+            onClick={manualUpload}
+            disabled={eventsCount === uploadedCount || uploadStatus === 'uploading'}
+            className="w-full px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed rounded transition-colors flex items-center justify-center gap-1.5"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Upload Now
+          </button>
+
           <button
             onClick={downloadRecording}
             disabled={eventsCount === 0}
