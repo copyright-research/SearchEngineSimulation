@@ -25,6 +25,7 @@ export default function ReplayPage() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisReport, setAnalysisReport] = useState<string>('');
   const playerContainerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const playerInstanceRef = useRef<any>(null);
 
   // 加载录制文件

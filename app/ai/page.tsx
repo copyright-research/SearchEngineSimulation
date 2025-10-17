@@ -312,7 +312,6 @@ export default function AIModePage() {
                                       </svg>
                                       Sources
                                       {(() => {
-                                        const citedNumbers = extractCitedNumbers(textContent);
                                         const isClickFiltered = filteredSourceNumbers && filteredSourceNumbers.length > 0 && activeMessageId === message.id;
                                         
                                         if (isClickFiltered) {
@@ -342,7 +341,7 @@ export default function AIModePage() {
                                 <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
                                   {(() => {
                                     // 从 AI 回答中提取所有被引用的数字
-                                    const citedNumbers = extractCitedNumbers(textContent);
+                                    const citedNumbersForDisplay = extractCitedNumbers(textContent);
                                     
                                     // 确定要显示的 sources
                                     let displaySources: SearchResult[];
@@ -356,11 +355,11 @@ export default function AIModePage() {
                                       sourceNumbers = filteredSourceNumbers;
                                     } 
                                     // 否则，默认只显示被 AI 引用过的来源
-                                    else if (citedNumbers.length > 0) {
+                                    else if (citedNumbersForDisplay.length > 0) {
                                       displaySources = messageSources.filter((_, idx) => 
-                                        citedNumbers.includes(idx + 1)
+                                        citedNumbersForDisplay.includes(idx + 1)
                                       );
-                                      sourceNumbers = citedNumbers;
+                                      sourceNumbers = citedNumbersForDisplay;
                                     }
                                     // 如果没有引用（理论上不应该发生），显示所有来源
                                     else {

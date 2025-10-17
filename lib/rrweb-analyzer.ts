@@ -55,25 +55,21 @@ export class RRWebAnalyzer {
     const elementInteractions = new Map<string, ElementInteraction>();
 
     // 遍历所有事件
-    this.events.forEach((event, index) => {
-      // @ts-expect-error - rrweb event types
-      const eventType = event.type;
-      // @ts-expect-error - rrweb event types
-      const data = event.data;
+    this.events.forEach((event) => {
+      const eventType = (event as Record<string, unknown>).type;
+      const data = (event as Record<string, unknown>).data as Record<string, unknown> | undefined;
 
       // 点击事件
       if (eventType === 3 && data?.source === 2) { // IncrementalSource.MouseInteraction
         if (data.type === 2) { // Click
           clicks.push({
             timestamp: event.timestamp,
-            x: data.x,
-            y: data.y,
-            // @ts-expect-error - optional property
-            target: data.target || 'unknown',
+            x: (data.x as number) || 0,
+            y: (data.y as number) || 0,
+            target: (data.target as string) || 'unknown',
           });
 
           // 更新元素交互统计
-          // @ts-expect-error - optional property
           const selector = this.getElementSelector(data.target);
           if (selector) {
             const interaction = elementInteractions.get(selector) || {
@@ -142,10 +138,10 @@ export class RRWebAnalyzer {
   /**
    * 获取元素选择器（简化版）
    */
-  private getElementSelector(target: any): string | null {
+  private getElementSelector(target: unknown): string | null {
     if (!target) return null;
     // 这里简化处理，实际可以根据 rrweb 的 mirror 获取更准确的选择器
-    return target.tagName || 'unknown';
+    return (target as { tagName?: string }).tagName || 'unknown';
   }
 
   /**
