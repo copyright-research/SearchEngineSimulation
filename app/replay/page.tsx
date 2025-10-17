@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
 import rrwebPlayer from 'rrweb-player';
 import 'rrweb-player/dist/style.css';
 import type { eventWithTime } from '@rrweb/types';
@@ -15,6 +13,13 @@ import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 
 // 注册 AG Grid 模块
 ModuleRegistry.registerModules([AllCommunityModule]);
+
+// 配置 AG Grid 主题
+const myTheme = themeQuartz.withParams({
+  backgroundColor: '#fff',
+  foregroundColor: '#181d1f',
+  browserColorScheme: 'light',
+});
 
 export const dynamic = 'force-dynamic';
 
@@ -128,8 +133,8 @@ export default function ReplayPage() {
     }
   };
 
-  // 初始化播放器
-  useEffect(() => {
+  // 计算并初始化播放器尺寸
+  const initializePlayer = useCallback(() => {
     if (!recordingData || !playerContainerRef.current) return;
 
     const container = playerContainerRef.current;
@@ -139,11 +144,16 @@ export default function ReplayPage() {
     }
 
     try {
-      const viewport = recordingData.metadata?.viewport || { width: 1280, height: 720 };
-      const aspectRatio = viewport.width / viewport.height;
-      const maxWidth = 1400;
-      const playerWidth = Math.min(viewport.width, maxWidth);
-      const playerHeight = playerWidth / aspectRatio;
+      // 获取容器的实际宽高（容器占满整个右侧面板）
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      
+      // rrweb-player 控制器的默认高度约为 80px，预留这个空间
+      const controllerHeight = 80;
+      
+      // 播放器尺寸 = 容器尺寸（会自动适配并居中显示录制内容）
+      const playerWidth = containerWidth;
+      const playerHeight = containerHeight - controllerHeight;
 
       playerInstanceRef.current = new rrwebPlayer({
         target: container,
@@ -151,6 +161,7 @@ export default function ReplayPage() {
           events: recordingData.events,
           width: playerWidth,
           height: playerHeight,
+          maxScale: 0, // 0 表示无限缩放，允许播放器自适应容器
           autoPlay: false,
           speedOption: [0.5, 1, 2, 4, 8],
           skipInactive: true,
@@ -168,19 +179,31 @@ export default function ReplayPage() {
         },
       });
 
-      console.log('[rrweb] Player initialized');
+      console.log('[rrweb] Player initialized with size:', { 
+        playerWidth, 
+        playerHeight: playerHeight + controllerHeight,
+        actualPlayerHeight: playerHeight,
+        controllerHeight,
+        containerWidth,
+        containerHeight
+      });
     } catch (err) {
       setError('Failed to initialize player');
       console.error('[rrweb] Player error:', err);
     }
+  }, [recordingData]);
+
+  // 初始化播放器
+  useEffect(() => {
+    initializePlayer();
 
     return () => {
-      if (playerInstanceRef.current && container) {
-        container.innerHTML = '';
+      if (playerInstanceRef.current && playerContainerRef.current) {
+        playerContainerRef.current.innerHTML = '';
         playerInstanceRef.current = null;
       }
     };
-  }, [recordingData]);
+  }, [initializePlayer]);
 
   // 分析录制
   const handleAnalyze = () => {
@@ -240,6 +263,12 @@ export default function ReplayPage() {
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      // 当调整完宽度后，重新初始化播放器以适应新尺寸
+      if (playerInstanceRef.current && recordingData) {
+        setTimeout(() => {
+          initializePlayer();
+        }, 100);
+      }
     };
 
     if (isResizing) {
@@ -255,7 +284,7 @@ export default function ReplayPage() {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [isResizing]);
+  }, [isResizing, recordingData, initializePlayer]);
 
   // AG Grid 列定义
   const columnDefs: ColDef<RecordingInfo>[] = [
@@ -400,8 +429,9 @@ export default function ReplayPage() {
             </div>
           </div>
 
-          <div className="flex-1 ag-theme-alpine">
+          <div className="flex-1">
             <AgGridReact
+              theme={myTheme}
               rowData={recordings}
               columnDefs={columnDefs}
               defaultColDef={{
@@ -437,7 +467,7 @@ export default function ReplayPage() {
 
         {/* Right: Player */}
         <div 
-          className="flex flex-col bg-gray-50 dark:bg-gray-900 overflow-auto"
+          className="flex flex-col bg-gray-50 dark:bg-gray-900"
           style={{ width: `${100 - leftWidth}%` }}
         >
           {!selectedRecording && (
@@ -475,10 +505,10 @@ export default function ReplayPage() {
           )}
 
           {recordingData && (
-            <div className="p-6 space-y-4">
+            <div className="flex-1 flex items-center justify-center">
               <div
                 ref={playerContainerRef}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden"
+                className="w-full h-full flex items-center justify-center"
               />
             </div>
           )}

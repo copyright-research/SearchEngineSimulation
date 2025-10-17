@@ -7,15 +7,15 @@ import type { eventWithTime } from '@rrweb/types';
 interface UseRRWebRecorderOptions {
   enabled: boolean;
   recordingId?: string;
-  uploadInterval?: number; // 上传间隔（毫秒），默认 30 秒
-  uploadBatchSize?: number; // 批量上传事件数量，默认 100
+  uploadInterval?: number; // 定时上传间隔（毫秒），默认 30 秒
+  debounceMs?: number; // 防抖延迟（毫秒），默认 2 秒
 }
 
 export function useRRWebRecorder({ 
   enabled, 
   recordingId,
   uploadInterval = 30000, // 30 秒
-  uploadBatchSize = 100, // 100 个事件
+  debounceMs = 500, // 2 秒防抖
 }: UseRRWebRecorderOptions) {
   const [isRecording, setIsRecording] = useState(false);
   const [eventsCount, setEventsCount] = useState(0);
@@ -26,10 +26,11 @@ export function useRRWebRecorder({
   const eventsRef = useRef<eventWithTime[]>([]); // 所有事件
   const lastUploadedIndexRef = useRef(0); // 上次上传到的索引
   const chunkIndexRef = useRef(0); // 当前 chunk 索引
-  const uploadIntervalRef = useRef<NodeJS.Timeout | null>(null); // 定时器
+  const uploadIntervalRef = useRef<NodeJS.Timeout | null>(null); // 定时上传定时器
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null); // 防抖定时器
   const sessionIdRef = useRef<string>(''); // 唯一的 session ID
 
-  // 上传增量事件（使用 ref 来避免重复调用）
+  // 上传增量事件
   const uploadingRef = useRef(false); // 防止并发上传
   
   const uploadChunk = useCallback(async (force = false) => {
@@ -45,13 +46,10 @@ export function useRRWebRecorder({
     const lastUploadedIndex = lastUploadedIndexRef.current;
     const newEventsCount = totalEvents - lastUploadedIndex;
 
-    // 检查是否需要上传
-    if (!force && newEventsCount < uploadBatchSize) {
-      return; // 新事件不足，跳过上传
-    }
-
-    if (newEventsCount === 0) {
-      return; // 没有新事件
+    // 如果没有新事件或者新事件数为 0，跳过
+    if (newEventsCount <= 0) {
+      console.log('[rrweb] No new events to upload, skipping...');
+      return;
     }
 
     try {
@@ -61,21 +59,28 @@ export function useRRWebRecorder({
       // 获取新增的事件
       const newEvents = eventsRef.current.slice(lastUploadedIndex);
 
-      console.log(`[rrweb] Uploading chunk ${chunkIndexRef.current} for session ${sessionIdRef.current}: ${newEvents.length} events`);
+      // 二次检查：确保新事件数组不为空
+      if (!Array.isArray(newEvents) || newEvents.length === 0) {
+        console.warn('[rrweb] New events array is empty, aborting upload');
+        return;
+      }
+
+      console.log(`[rrweb] Uploading chunk ${chunkIndexRef.current} for session ${sessionIdRef.current}: ${newEvents.length} events (force: ${force})`);
 
       const response = await fetch('/api/rrweb/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recordingId,
-          sessionId: sessionIdRef.current, // 传递唯一的 sessionId
+          sessionId: sessionIdRef.current,
           events: newEvents,
           chunkIndex: chunkIndexRef.current,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`Upload failed: ${response.status} - ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
@@ -94,7 +99,20 @@ export function useRRWebRecorder({
     } finally {
       uploadingRef.current = false; // 释放锁
     }
-  }, [recordingId, uploadBatchSize]);
+  }, [recordingId]);
+
+  // 防抖上传：每次有新事件时触发，但会等待一段时间没有新事件后才真正上传
+  const debouncedUpload = useCallback(() => {
+    // 清除之前的防抖定时器
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // 设置新的防抖定时器
+    debounceTimerRef.current = setTimeout(() => {
+      uploadChunk(false);
+    }, debounceMs);
+  }, [uploadChunk, debounceMs]);
 
   // 录制逻辑
   useEffect(() => {
@@ -126,14 +144,16 @@ export function useRRWebRecorder({
           setEventsCount(eventsRef.current.length);
         }
 
-        // 检查是否达到批量上传阈值
-        const newEventsCount = eventsRef.current.length - lastUploadedIndexRef.current;
-        if (newEventsCount >= uploadBatchSize) {
-          uploadChunk();
-        }
+        // 每次有新事件时触发防抖上传
+        debouncedUpload();
       },
       checkoutEveryNms: 30 * 1000,
       checkoutEveryNth: 200,
+      // 阻止录制带有 rr-block 类的元素（如录屏监控 UI 本身）
+      blockClass: 'rr-block',
+      // 可选：阻止录制输入框的内容（保护隐私）
+      // maskTextClass: 'rr-mask',
+      // maskAllInputs: true,
     });
 
     if (stopFn) {
@@ -180,6 +200,12 @@ export function useRRWebRecorder({
         uploadIntervalRef.current = null;
       }
 
+      // 清除防抖定时器
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+
       // 移除事件监听
       window.removeEventListener('beforeunload', handleBeforeUnload);
 
@@ -190,7 +216,7 @@ export function useRRWebRecorder({
 
       setIsRecording(false);
     };
-  }, [enabled, recordingId, uploadInterval, uploadBatchSize, uploadChunk]);
+  }, [enabled, recordingId, uploadInterval, uploadChunk, debouncedUpload]);
 
   // 下载录制数据
   const downloadRecording = () => {

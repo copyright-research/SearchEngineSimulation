@@ -40,7 +40,7 @@ export function RRWebRecorder() {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 z-50">
+    <div className="fixed bottom-20 right-4 z-50 rr-block">
       <div className="bg-gray-900/95 backdrop-blur-sm text-white rounded-lg shadow-2xl border border-gray-700 p-3 min-w-[200px]">
         {/* 状态指示器 */}
         <div className="flex items-center gap-2 mb-2">
