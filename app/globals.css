@@ -6,11 +6,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* 淡入动画 */
+/* 淡入动画 - 轻微且快速，保持丝滑 */
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -31,7 +31,7 @@
 }
 
 .animate-fade-in {
-  animation: fade-in 0.6s ease-out;
+  animation: fade-in 0.3s ease-out;
 }
 
 /* 自定义滚动条 */

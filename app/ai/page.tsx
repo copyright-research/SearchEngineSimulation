@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
+import { RRWebRecorder } from '@/components/RRWebRecorder';
 import type { SearchResult } from '@/types/search';
 
 export default function AIModePage() {
@@ -85,18 +86,49 @@ export default function AIModePage() {
     }
   };
 
-  // 自动滚动到最新消息
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // 自动滚动逻辑 - 基于 Stack Overflow dotnetCarpenter 的方案
+  // 只有用户在底部时才自动滚动，用户滚上去后停止
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
+  
+  // 检测用户是否在底部（允许 1px 误差）
+  const checkIfAtBottom = () => {
+    const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const currentScroll = window.pageYOffset;
+    const isAtBottom = scrollableHeight - currentScroll <= 1;
+    setIsUserAtBottom(isAtBottom);
+    return isAtBottom;
   };
-
-  // 当消息更新时滚动到底部（仅在 AI 正在回复时）
+  
+  // 滚动到底部
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      const element = messagesEndRef.current;
+      const elementRect = element.getBoundingClientRect();
+      const absoluteElementTop = elementRect.top + window.pageYOffset;
+      
+      window.scrollTo({
+        top: absoluteElementTop + 100,
+        behavior: 'smooth'
+      });
+    }
+  };
+  
+  // 监听用户滚动事件
   useEffect(() => {
-    // 只在 streaming 状态下自动滚动，这样可以让新消息保持在顶部
-    if (status === 'streaming') {
+    const handleScroll = () => {
+      checkIfAtBottom();
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // 当消息更新时，只有用户在底部才自动滚动
+  useEffect(() => {
+    if (status === 'streaming' && isUserAtBottom) {
       scrollToBottom();
     }
-  }, [messages, status]);
+  }, [messages, status, isUserAtBottom]);
 
   // 当有新的 AI 消息时，关联 sources
   useEffect(() => {
@@ -110,7 +142,9 @@ export default function AIModePage() {
         }));
       }
     }
-  }, [messages, currentSources, messageSourcesMap]);
+    // 移除 messageSourcesMap 依赖，避免循环更新
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, currentSources]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50">
@@ -206,8 +240,15 @@ export default function AIModePage() {
                     ? messageSourcesMap[message.id] || []
                     : [];
 
+                  // 只有完成的消息才使用动画，流式输出时不使用
+                  const isStreaming = status === 'streaming' && index === messages.length - 1;
+                  
                   return (
-                    <div key={message.id} className="animate-fade-in">
+                    <div 
+                      key={message.id} 
+                      className={isStreaming ? '' : 'animate-fade-in'}
+                      style={{ contain: 'layout style paint' }}
+                    >
                       {message.role === 'user' ? (
                         // 用户消息
                         <div className="flex justify-end">
@@ -278,12 +319,6 @@ export default function AIModePage() {
                                           return (
                                             <span className="text-[10px] text-blue-600 dark:text-blue-400">
                                               ({filteredSourceNumbers.join(', ')})
-                                            </span>
-                                          );
-                                        } else if (citedNumbers.length > 0) {
-                                          return (
-                                            <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                              (Cited only)
                                             </span>
                                           );
                                         }
@@ -400,8 +435,8 @@ export default function AIModePage() {
               {/* 弹性空间 - 推动内容到顶部，底部留白 */}
               <div className="flex-grow" />
               
-              {/* 滚动锚点 */}
-              <div ref={messagesEndRef} />
+              {/* 滚动锚点 - 添加底部间距避开固定输入框 */}
+              <div ref={messagesEndRef} className="h-4" />
             </div>
           )}
         </main>
@@ -438,6 +473,9 @@ export default function AIModePage() {
           </div>
         </div>
       </div>
+
+      {/* rrweb 录制器 */}
+      <RRWebRecorder />
     </div>
   );
 }
