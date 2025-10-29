@@ -134,6 +134,24 @@ export function useRRWebRecorder({
     setUploadedCount(0);
     setUploadStatus('idle');
     
+    // 监听页面可见性变化
+    const handleVisibilityChange = () => {
+      const isHidden = document.hidden;
+      // 记录页面可见性变化事件（作为自定义事件）
+      eventsRef.current.push({
+        type: 6, // Plugin 事件
+        data: {
+          plugin: 'page-visibility',
+          payload: {
+            type: 'visibilitychange',
+            hidden: isHidden,
+          },
+        },
+        timestamp: Date.now(),
+      } as eventWithTime);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // 开始录制
     const stopFn = record({
       emit(event) {
@@ -208,6 +226,7 @@ export function useRRWebRecorder({
 
       // 移除事件监听
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
 
       // 上传最后的事件（只在正常停止时，不在页面卸载时）
       if (eventsRef.current.length > lastUploadedIndexRef.current) {

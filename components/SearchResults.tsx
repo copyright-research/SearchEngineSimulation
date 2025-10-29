@@ -116,7 +116,8 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
 
   return (
     <article 
-      className="group p-4 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:shadow-md border border-transparent hover:border-gray-200"
+      className="search-result-item group p-4 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:shadow-md border border-transparent hover:border-gray-200"
+      data-result-index={index + 1}
       style={{
         animation: `fadeInUp 0.4s ease-out ${index * 0.05}s both`,
       }}
@@ -148,7 +149,9 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
             href={result.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="block group/link"
+            className="search-result-link block group/link"
+            data-result-index={index + 1}
+            data-result-title={result.title}
           >
             <h2 className="text-xl text-blue-600 group-hover/link:text-blue-800 group-hover/link:underline font-normal mb-2 line-clamp-2 leading-snug">
               {result.title}

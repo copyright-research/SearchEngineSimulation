@@ -54,6 +54,45 @@ interface WorkflowStep {
   details?: unknown;
 }
 
+interface SearchResultClick {
+  timestamp: number;
+  resultIndex: number | null; // 搜索结果排名（第几个）
+  linkText: string;
+  linkUrl: string;
+  elementInfo: {
+    tagName: string;
+    className: string;
+    id: string;
+    textContent: string;
+  };
+  position: { x: number; y: number };
+}
+
+interface PageVisibilityChange {
+  timestamp: number;
+  type: 'hidden' | 'visible'; // 页面是否可见
+  reason: string; // 离开或返回的原因描述
+}
+
+interface UserJourney {
+  searchResultClicks: SearchResultClick[];
+  pageVisibilityChanges: PageVisibilityChange[];
+  linkClicks: Array<{
+    timestamp: number;
+    linkIndex: number | null; // 蓝色链接在页面中的排名
+    linkText: string;
+    linkUrl: string;
+    isSearchResult: boolean;
+    position: { x: number; y: number };
+  }>;
+  timeline: Array<{
+    timestamp: number;
+    type: 'click_result' | 'click_link' | 'leave_page' | 'return_page' | 'navigate';
+    description: string;
+    details: unknown;
+  }>;
+}
+
 interface HeatmapPoint {
   x: number;
   y: number;
@@ -95,6 +134,7 @@ interface AnalysisResult {
   activeTime?: number;
   idleTime?: number;
   enterKeyPresses?: Array<{ timestamp: number; afterInput: boolean }>;
+  userJourney?: UserJourney;
 }
 
 export class RRWebAnalyzer {
@@ -124,6 +164,7 @@ export class RRWebAnalyzer {
       activeTime: this.calculateActiveTime(),
       idleTime: this.calculateIdleTime(),
       enterKeyPresses: this.getEnterKeyPresses(),
+      userJourney: this.analyzeUserJourney(),
     };
   }
 
@@ -655,9 +696,75 @@ ${analysis.enterKeyPresses?.slice(0, 5).map((enter, i) =>
 ${analysis.scrollSequence && analysis.scrollSequence.length > 0
   ? `- 平均滚动位置: Y=${Math.round(analysis.scrollSequence.reduce((sum, s) => sum + s.y, 0) / analysis.scrollSequence.length)}`
   : ''}
+
+🗺️ 用户旅程分析
+${this.formatUserJourney(analysis.userJourney)}
 `;
 
     return basicReport + additionalSections;
+  }
+
+  /**
+   * 格式化用户旅程报告
+   */
+  private formatUserJourney(journey: UserJourney | undefined): string {
+    if (!journey) return '- 无用户旅程数据';
+
+    const sections: string[] = [];
+
+    // 搜索结果点击
+    if (journey.searchResultClicks.length > 0) {
+      sections.push('🔍 搜索结果点击:');
+      journey.searchResultClicks.forEach((click, i) => {
+        const time = new Date(click.timestamp).toLocaleTimeString();
+        sections.push(`  ${i + 1}. ${time} - 结果 #${click.resultIndex || '?'}: ${click.linkText}`);
+        sections.push(`     URL: ${click.linkUrl}`);
+      });
+    } else {
+      sections.push('🔍 搜索结果点击: 未检测到');
+    }
+
+    // 链接点击
+    if (journey.linkClicks.length > 0) {
+      sections.push('\n🔗 蓝色链接点击:');
+      journey.linkClicks.forEach((click, i) => {
+        const time = new Date(click.timestamp).toLocaleTimeString();
+        sections.push(`  ${i + 1}. ${time} - 链接 #${click.linkIndex || '?'}: ${click.linkText}`);
+        sections.push(`     URL: ${click.linkUrl}`);
+      });
+    } else {
+      sections.push('\n🔗 蓝色链接点击: 未检测到');
+    }
+
+    // 页面可见性变化
+    if (journey.pageVisibilityChanges.length > 0) {
+      sections.push('\n👁️ 页面离开/返回:');
+      journey.pageVisibilityChanges.forEach((change, i) => {
+        const time = new Date(change.timestamp).toLocaleTimeString();
+        const icon = change.type === 'hidden' ? '🚪' : '🔙';
+        sections.push(`  ${i + 1}. ${time} ${icon} ${change.reason}`);
+      });
+    } else {
+      sections.push('\n👁️ 页面离开/返回: 未检测到');
+    }
+
+    // 时间线（完整序列）
+    if (journey.timeline.length > 0) {
+      sections.push('\n📅 完整时间线 (按时间顺序):');
+      journey.timeline.forEach((event, i) => {
+        const time = new Date(event.timestamp).toLocaleTimeString();
+        const icon = {
+          click_result: '🔍',
+          click_link: '🔗',
+          leave_page: '🚪',
+          return_page: '🔙',
+          navigate: '🧭',
+        }[event.type] || '•';
+        sections.push(`  ${i + 1}. ${time} ${icon} ${event.description}`);
+      });
+    }
+
+    return sections.join('\n') || '- 无用户旅程数据';
   }
 
   /**
@@ -767,6 +874,317 @@ ${this.generateRecommendations(analysis)}
     }
 
     return recommendations.join('\n');
+  }
+
+  /**
+   * 分析用户旅程：追踪搜索结果点击、链接点击、页面离开/返回
+   */
+  analyzeUserJourney(): UserJourney {
+    const searchResultClicks: SearchResultClick[] = [];
+    const pageVisibilityChanges: PageVisibilityChange[] = [];
+    const linkClicks: Array<{
+      timestamp: number;
+      linkIndex: number | null;
+      linkText: string;
+      linkUrl: string;
+      isSearchResult: boolean;
+      position: { x: number; y: number };
+    }> = [];
+    const timeline: Array<{
+      timestamp: number;
+      type: 'click_result' | 'click_link' | 'leave_page' | 'return_page' | 'navigate';
+      description: string;
+      details: unknown;
+    }> = [];
+
+    // 用于存储 DOM 快照，帮助识别点击的元素
+    let currentDomSnapshot: Record<string, unknown> | null = null;
+    let allLinks: Array<{ id: number; href: string; text: string }> = [];
+
+    this.events.forEach((event) => {
+      const eventType = (event as Record<string, unknown>).type;
+      const data = (event as Record<string, unknown>).data as Record<string, unknown> | undefined;
+
+      // 1. 处理 FullSnapshot 事件 (type: 2) - 获取 DOM 结构
+      if (eventType === 2) {
+        currentDomSnapshot = data as Record<string, unknown> | null;
+        // 从快照中提取所有链接
+        allLinks = this.extractLinksFromSnapshot(currentDomSnapshot);
+      }
+
+      // 2. 处理 IncrementalSnapshot 事件 (type: 3) - DOM 更新
+      if (eventType === 3 && data?.source === 0) {
+        // Mutation 事件，可能有新的链接添加
+        const adds = (data.adds as Array<Record<string, unknown>>) || [];
+        adds.forEach((add) => {
+          const node = add.node as Record<string, unknown> | undefined;
+          if (node?.type === 2 && (node.tagName as string)?.toLowerCase() === 'a') {
+            const attributes = (node.attributes as Record<string, string>) || {};
+            allLinks.push({
+              id: (add.nextId as number) || (node.id as number) || 0,
+              href: attributes.href || '',
+              text: this.extractTextContent(node),
+            });
+          }
+        });
+      }
+
+      // 3. 处理点击事件 (type: 3, source: 2, type: 2)
+      if (eventType === 3 && data?.source === 2 && data.type === 2) {
+        const clickX = (data.x as number) || 0;
+        const clickY = (data.y as number) || 0;
+        const targetId = (data.id as number) || 0;
+
+        // 尝试从点击目标中提取元素信息
+        const elementInfo = this.getElementInfo(targetId, currentDomSnapshot);
+        
+        // 判断是否点击了链接
+        const clickedLink = allLinks.find((link) => link.id === targetId);
+        
+        if (clickedLink) {
+          // 判断是否是搜索结果
+          const isSearchResult = this.isSearchResultLink(elementInfo);
+          const linkIndex = allLinks.indexOf(clickedLink) + 1;
+
+          if (isSearchResult) {
+            // 搜索结果点击
+            const resultClick: SearchResultClick = {
+              timestamp: event.timestamp,
+              resultIndex: this.extractSearchResultIndex(elementInfo),
+              linkText: clickedLink.text,
+              linkUrl: clickedLink.href,
+              elementInfo: {
+                tagName: elementInfo.tagName || 'a',
+                className: elementInfo.className || '',
+                id: elementInfo.id || '',
+                textContent: clickedLink.text,
+              },
+              position: { x: clickX, y: clickY },
+            };
+            searchResultClicks.push(resultClick);
+
+            timeline.push({
+              timestamp: event.timestamp,
+              type: 'click_result',
+              description: `点击搜索结果 #${resultClick.resultIndex || '?'}: ${clickedLink.text}`,
+              details: resultClick,
+            });
+          } else {
+            // 普通链接点击
+            linkClicks.push({
+              timestamp: event.timestamp,
+              linkIndex: linkIndex,
+              linkText: clickedLink.text,
+              linkUrl: clickedLink.href,
+              isSearchResult: false,
+              position: { x: clickX, y: clickY },
+            });
+
+            timeline.push({
+              timestamp: event.timestamp,
+              type: 'click_link',
+              description: `点击链接 #${linkIndex}: ${clickedLink.text}`,
+              details: { linkUrl: clickedLink.href, linkText: clickedLink.text },
+            });
+          }
+        }
+      }
+
+      // 4. 处理页面导航事件 (type: 4) - 检测页面跳转
+      if (eventType === 4 && data?.href) {
+        timeline.push({
+          timestamp: event.timestamp,
+          type: 'navigate',
+          description: `导航到: ${data.href}`,
+          details: { url: data.href },
+        });
+      }
+
+      // 5. 处理页面可见性变化 (通过检测特定的 Plugin 事件)
+      // rrweb 使用 plugin 来记录 visibilitychange 事件
+      if (eventType === 6) { // Plugin 事件
+        const pluginData = data?.plugin;
+        if (pluginData === 'rrweb/console@1') {
+          // 这是 console 插件，跳过
+        } else if (data?.payload) {
+          // 可能是 visibility 相关事件
+          const payload = data.payload as Record<string, unknown>;
+          if (payload.type === 'visibilitychange') {
+            const isHidden = payload.hidden as boolean;
+            const change: PageVisibilityChange = {
+              timestamp: event.timestamp,
+              type: isHidden ? 'hidden' : 'visible',
+              reason: isHidden ? '用户离开了页面（切换标签页或最小化）' : '用户返回了页面',
+            };
+            pageVisibilityChanges.push(change);
+
+            timeline.push({
+              timestamp: event.timestamp,
+              type: isHidden ? 'leave_page' : 'return_page',
+              description: change.reason,
+              details: { hidden: isHidden },
+            });
+          }
+        }
+      }
+    });
+
+    return {
+      searchResultClicks,
+      pageVisibilityChanges,
+      linkClicks,
+      timeline,
+    };
+  }
+
+  /**
+   * 从 DOM 快照中提取所有链接
+   */
+  private extractLinksFromSnapshot(snapshot: Record<string, unknown> | null): Array<{ id: number; href: string; text: string }> {
+    if (!snapshot) return [];
+    
+    const links: Array<{ id: number; href: string; text: string }> = [];
+    
+    const traverse = (node: Record<string, unknown> | null) => {
+      if (!node) return;
+      
+      // 检查是否是元素节点 (type: 2)
+      if (node.type === 2) {
+        const tagName = (node.tagName as string)?.toLowerCase();
+        if (tagName === 'a') {
+          const attributes = (node.attributes as Record<string, string>) || {};
+          links.push({
+            id: (node.id as number) || 0,
+            href: attributes.href || '',
+            text: this.extractTextContent(node),
+          });
+        }
+        
+        // 遍历子节点
+        const childNodes = (node.childNodes as Array<Record<string, unknown>>) || [];
+        childNodes.forEach((child) => traverse(child));
+      }
+    };
+    
+    traverse(snapshot);
+    return links;
+  }
+
+  /**
+   * 提取元素的文本内容
+   */
+  private extractTextContent(node: Record<string, unknown>): string {
+    let text = '';
+    
+    const traverse = (n: Record<string, unknown>) => {
+      // 文本节点 (type: 3)
+      if (n.type === 3) {
+        text += (n.textContent as string) || '';
+      }
+      
+      // 遍历子节点
+      const childNodes = (n.childNodes as Array<Record<string, unknown>>) || [];
+      childNodes.forEach((child) => traverse(child));
+    };
+    
+    traverse(node);
+    return text.trim();
+  }
+
+  /**
+   * 获取元素信息
+   */
+  private getElementInfo(targetId: number, snapshot: Record<string, unknown> | null): {
+    tagName: string;
+    className: string;
+    id: string;
+    dataAttributes?: Record<string, string>;
+  } {
+    if (!snapshot) {
+      return { tagName: '', className: '', id: '', dataAttributes: {} };
+    }
+    
+    let foundElement: Record<string, unknown> | null = null;
+    
+    const traverse = (node: Record<string, unknown> | null): boolean => {
+      if (!node) return false;
+      
+      if (node.id === targetId) {
+        foundElement = node;
+        return true;
+      }
+      
+      const childNodes = (node.childNodes as Array<Record<string, unknown>>) || [];
+      for (const child of childNodes) {
+        if (traverse(child)) return true;
+      }
+      
+      return false;
+    };
+    
+    traverse(snapshot);
+    
+    if (foundElement && typeof foundElement === 'object' && foundElement !== null) {
+      const elem = foundElement as { attributes?: Record<string, string>; tagName?: string };
+      const attributes = elem.attributes || {};
+      
+      // 提取 data- 属性
+      const dataAttributes: Record<string, string> = {};
+      Object.keys(attributes).forEach((key) => {
+        if (key.startsWith('data-')) {
+          const dataKey = key.replace('data-', '').replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+          dataAttributes[dataKey] = attributes[key];
+        }
+      });
+      
+      return {
+        tagName: elem.tagName || '',
+        className: attributes.class || '',
+        id: attributes.id || '',
+        dataAttributes,
+      };
+    }
+    
+    return { tagName: '', className: '', id: '', dataAttributes: {} };
+  }
+
+  /**
+   * 判断是否是搜索结果链接
+   */
+  private isSearchResultLink(elementInfo: { tagName: string; className: string; id: string; dataAttributes?: Record<string, string> }): boolean {
+    // 根据你的页面结构判断
+    // 例如，搜索结果可能有特定的 class 名
+    const className = elementInfo.className.toLowerCase();
+    const id = elementInfo.id.toLowerCase();
+    const dataAttrs = elementInfo.dataAttributes || {};
+    
+    return (
+      className.includes('search-result') ||
+      className.includes('result-item') ||
+      className.includes('result-link') ||
+      id.includes('result') ||
+      'resultIndex' in dataAttrs
+    );
+  }
+
+  /**
+   * 提取搜索结果的索引（第几个）
+   */
+  private extractSearchResultIndex(elementInfo: { tagName: string; className: string; id: string; dataAttributes?: Record<string, string> }): number | null {
+    // 优先从 data-result-index 属性中提取
+    const dataAttrs = elementInfo.dataAttributes || {};
+    if (dataAttrs.resultIndex) {
+      const index = parseInt(dataAttrs.resultIndex, 10);
+      if (!isNaN(index)) return index;
+    }
+    
+    // 尝试从 class 或 id 中提取索引
+    const text = `${elementInfo.className} ${elementInfo.id}`;
+    const match = text.match(/result[-_]?(\d+)/i);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+    return null;
   }
 
   exportAnalysis(analysis: AnalysisResult): string {
