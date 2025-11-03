@@ -72,7 +72,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 保存答案
-    const result = await saveUserAnswer(rid, questionId, answer);
+    const result = await saveUserAnswer(rid, questionId, answer) as unknown as { 
+      is_correct: boolean; 
+      correct_answer: number; 
+    };
 
     return NextResponse.json({
       success: true,

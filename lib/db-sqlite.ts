@@ -190,9 +190,9 @@ export function getSearchHistory(rid: string, limit = 50) {
     db.close();
     
     // 解析 JSON 字段
-    return results.map((row: any) => ({
+    return (results as Array<Record<string, unknown>>).map((row) => ({
       ...row,
-      results: JSON.parse(row.results),
+      results: JSON.parse(row.results as string),
     }));
   } catch (error) {
     db.close();
@@ -270,9 +270,9 @@ export function getVerificationQuestions(rid: string) {
     db.close();
     
     // 解析 JSON 字段
-    return results.map((row: any) => ({
+    return (results as Array<Record<string, unknown>>).map((row) => ({
       ...row,
-      options: JSON.parse(row.options),
+      options: JSON.parse(row.options as string),
     }));
   } catch (error) {
     db.close();
@@ -298,14 +298,14 @@ export function saveUserAnswer(
       WHERE id = ? AND rid = ?
     `);
     
-    const question = questionStmt.get(questionId, rid) as any;
+    const question = questionStmt.get(questionId, rid) as Record<string, unknown> | undefined;
     
     if (!question) {
       db.close();
       throw new Error('Question not found');
     }
 
-    const correctAnswer = question.correct_answer;
+    const correctAnswer = question.correct_answer as number;
     const isCorrect = userAnswer === correctAnswer ? 1 : 0;
 
     const stmt = db.prepare(`
@@ -314,7 +314,7 @@ export function saveUserAnswer(
       RETURNING *
     `);
     
-    const result = stmt.get(rid, questionId, userAnswer, isCorrect) as any;
+    const result = stmt.get(rid, questionId, userAnswer, isCorrect) as Record<string, unknown>;
     db.close();
     
     return {

@@ -1,11 +1,10 @@
-import { groq } from '@ai-sdk/groq';
+import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
 import { NextRequest } from 'next/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { hybridSearch } from '@/lib/tavily-search';
 import { searchGoogle } from '@/lib/google-search';
 import type { SearchResult } from '@/types/search';
-import { google } from '@ai-sdk/google';
 
 // Removed edge runtime as it's not compatible with the AI SDK
 // export const runtime = 'edge';

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
-import { hybridSearch } from '@/lib/tavily-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 // 全局每日限制（保护 Google API 免费额度）

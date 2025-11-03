@@ -111,16 +111,19 @@ export function mergeSearchResults(
 
   // 如果启用 debug 模式，添加 searchSource 字段
   if (includeSource) {
-    return finalResults.map(result => ({
-      ...result,
-      searchSource: result.source as 'tavily' | 'google',
-      // 移除内部使用的 source 字段
-      source: undefined,
-    })).map(({ source, ...result }) => result);
+    return finalResults.map(result => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { source: _, ...rest } = result;
+      return {
+        ...rest,
+        searchSource: result.source as 'tavily' | 'google',
+      };
+    });
   }
 
   // 移除 source 字段（内部使用）
-  return finalResults.map(({ source, ...result }) => result);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return finalResults.map(({ source: _, ...result }) => result);
 }
 
 /**
