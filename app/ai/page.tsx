@@ -9,6 +9,7 @@ import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
 import { RRWebRecorder } from '@/components/RRWebRecorder';
 import type { SearchResult } from '@/types/search';
+import { useSearchHistory } from '@/lib/use-search-history';
 
 export default function AIModePage() {
   // 为每条消息存储对应的 sources（使用消息 ID 作为 key）
@@ -17,6 +18,9 @@ export default function AIModePage() {
   const [filteredSourceNumbers, setFilteredSourceNumbers] = useState<number[] | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null); // 追踪哪个消息的引用被点击了
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // 搜索历史保存
+  const { saveSearchHistory } = useSearchHistory();
 
   // 从文本中提取所有被引用的数字
   const extractCitedNumbers = (text: string): number[] => {
@@ -38,6 +42,33 @@ export default function AIModePage() {
     }),
     onFinish: async (options) => {
       console.log('Message finished:', options.message);
+      
+      // 保存AI对话历史
+      const message = options.message;
+      if (message.role === 'assistant') {
+        const textContent = message.parts
+          .filter((part) => part.type === 'text')
+          .map((part) => ('text' in part ? part.text : ''))
+          .join('');
+        
+        const sources = messageSourcesMap[message.id] || currentSources;
+        
+        // 获取对应的用户查询
+        const userMessageIndex = messages.findIndex(m => m.id === message.id) - 1;
+        if (userMessageIndex >= 0) {
+          const userMessage = messages[userMessageIndex];
+          const userQuery = userMessage.parts
+            .filter((part) => part.type === 'text')
+            .map((part) => ('text' in part ? part.text : ''))
+            .join('');
+          
+          if (userQuery && sources.length > 0) {
+            saveSearchHistory('ai', userQuery, sources, textContent).catch(err => {
+              console.error('Failed to save AI chat history:', err);
+            });
+          }
+        }
+      }
     },
     onError: (error) => {
       console.error('Chat error:', error);

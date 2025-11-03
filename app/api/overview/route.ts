@@ -2,6 +2,9 @@ import { groq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 import { NextRequest } from 'next/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { hybridSearch } from '@/lib/tavily-search';
+import { searchGoogle } from '@/lib/google-search';
+import type { SearchResult } from '@/types/search';
 
 // Removed edge runtime as it's not compatible with the AI SDK
 // export const runtime = 'edge';
@@ -61,15 +64,38 @@ export async function POST(req: NextRequest) {
 
     const { query, results } = body;
 
-    if (!query || !results || results.length === 0) {
-      console.error('Invalid request data:', { query: !!query, resultsLength: results?.length });
-      return new Response('Invalid request: missing query or results', { status: 400 });
+    if (!query) {
+      console.error('Invalid request data: missing query');
+      return new Response('Invalid request: missing query', { status: 400 });
     }
 
-    // 构建上下文：从搜索结果中提取信息
-    const context = results
-      .map((result: { title: string; snippet: string; displayLink: string }, index: number) => {
-        return `[${index + 1}] ${result.title}\n${result.snippet}\nSource: ${result.displayLink}`;
+    // 使用混合搜索（Google + Tavily）获取更高质量的结果用于 AI Overview
+    console.log('[AI Overview] Using hybrid search for:', query);
+    let enhancedResults: SearchResult[] = [];
+    
+    try {
+      // 使用混合搜索，并标记来源
+      enhancedResults = await hybridSearch(query, async (q) => {
+        const response = await searchGoogle(q);
+        return response.items || [];
+      }, { includeSource: true }); // 启用来源标记
+      console.log('[AI Overview] Enhanced results count:', enhancedResults.length);
+    } catch (error) {
+      console.error('[AI Overview] Hybrid search failed, falling back to provided results:', error);
+      // 如果混合搜索失败，使用前端传来的 Google 结果
+      enhancedResults = results || [];
+    }
+
+    if (enhancedResults.length === 0) {
+      console.error('No results available for AI Overview');
+      return new Response('No search results available', { status: 400 });
+    }
+
+    // 构建上下文：从混合搜索结果中提取信息
+    const context = enhancedResults
+      .slice(0, 10) // 最多使用前 10 个结果
+      .map((result, index) => {
+        return `[${index + 1}] ${result.title}\n${result.snippet}\nSource: ${result.displayLink || new URL(result.link).hostname}`;
       })
       .join('\n\n');
 
@@ -137,11 +163,15 @@ Overview:`;
       temperature: 0.7,
     });
 
+    // 将混合搜索结果编码到响应头中（使用 UTF-8）
+    const encodedResults = Buffer.from(JSON.stringify(enhancedResults.slice(0, 10)), 'utf-8').toString('base64');
+
     return result.toTextStreamResponse({
       headers: {
         'X-RateLimit-Limit': '30',
         'X-RateLimit-Remaining': rateLimitCheck.remaining.toString(),
         'X-RateLimit-Reset': new Date(rateLimitCheck.resetTime).toISOString(),
+        'X-Search-Results': encodedResults, // 添加搜索结果到响应头
       },
     });
   } catch (error) {

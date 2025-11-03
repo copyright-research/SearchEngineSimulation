@@ -9,9 +9,10 @@ import type { SearchResult } from '@/types/search';
 interface AIOverviewProps {
   query: string;
   results: SearchResult[];
+  onAIResponseComplete?: (response: string) => void;
 }
 
-export default function AIOverview({ query, results }: AIOverviewProps) {
+export default function AIOverview({ query, results, onAIResponseComplete }: AIOverviewProps) {
   const [completion, setCompletion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -20,6 +21,7 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
   const [filteredSourceNumbers, setFilteredSourceNumbers] = useState<number[] | null>(null);
   const [citedSourceNumbers, setCitedSourceNumbers] = useState<Set<number>>(new Set());
   const [sourcesMaxHeight, setSourcesMaxHeight] = useState<string>('600px');
+  const [enhancedResults, setEnhancedResults] = useState<SearchResult[]>(results); // 混合搜索结果
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +120,28 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
           throw new Error(`Failed to generate overview: ${response.status}`);
         }
 
+        // 从响应头获取混合搜索结果
+        const searchResultsHeader = response.headers.get('X-Search-Results');
+        if (searchResultsHeader) {
+          try {
+            // 使用 TextDecoder 正确解码 UTF-8
+            const binaryString = atob(searchResultsHeader);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            const decodedString = new TextDecoder('utf-8').decode(bytes);
+            const decodedResults = JSON.parse(decodedString);
+            
+            if (decodedResults && decodedResults.length > 0) {
+              setEnhancedResults(decodedResults);
+              console.log('Loaded enhanced results from response header:', decodedResults.length);
+            }
+          } catch (decodeError) {
+            console.warn('Failed to decode search results from header:', decodeError);
+          }
+        }
+
         if (!response.body) {
           throw new Error('No response body');
         }
@@ -126,16 +150,23 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
+        let fullResponse = '';
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           
           const text = decoder.decode(value, { stream: true });
+          fullResponse += text;
           setCompletion(prev => prev + text);
         }
 
         setIsLoading(false);
         console.log('Overview generation completed');
+        
+        // 通知父组件AI回答已完成
+        if (onAIResponseComplete && fullResponse) {
+          onAIResponseComplete(fullResponse);
+        }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           console.log('Overview request aborted');
@@ -315,7 +346,7 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
                       </span>
                     </div>
                     <div className="overflow-y-auto overflow-x-hidden pr-1 space-y-2 scrollbar-thin scrollbar-thumb-blue-200 dark:scrollbar-thumb-blue-800 scrollbar-track-transparent" style={{ maxHeight: sourcesMaxHeight }}>
-                      {results.slice(0, 10)
+                      {enhancedResults.slice(0, 10)
                         .map((result, index) => ({ result, originalIndex: index + 1 }))
                         .filter(({ originalIndex }) => {
                           // 如果有筛选条件，只显示筛选的来源
@@ -368,9 +399,21 @@ export default function AIOverview({ query, results }: AIOverviewProps) {
                                 <p className="text-xs font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-400 line-clamp-2 leading-tight">
                                   {result.title}
                                 </p>
-                                <p className="text-[10px] text-gray-600 dark:text-gray-400 truncate mt-1">
-                                  {result.displayLink}
-                                </p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <p className="text-[10px] text-gray-600 dark:text-gray-400 truncate">
+                                    {result.displayLink}
+                                  </p>
+                                  {/* 来源标签 */}
+                                  {result.searchSource && (
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                                      result.searchSource === 'tavily' 
+                                        ? 'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700' 
+                                        : 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700'
+                                    }`}>
+                                      {result.searchSource === 'tavily' ? '🎯 Tavily' : '🔍 Google'}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <svg className="flex-shrink-0 w-3 h-3 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

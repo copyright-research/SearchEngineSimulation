@@ -14,6 +14,8 @@ export interface SearchResult {
     }>;
     metatags?: Array<Record<string, string>>;
   };
+  // Debug 模式：搜索结果来源
+  searchSource?: 'tavily' | 'google';
 }
 
 export interface GoogleSearchResponse {

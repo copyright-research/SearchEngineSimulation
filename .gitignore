@@ -43,3 +43,8 @@ next-env.d.ts
 # ide
 .vscode
 .idea
+
+# local database
+/data/*.db
+/data/*.db-shm
+/data/*.db-wal

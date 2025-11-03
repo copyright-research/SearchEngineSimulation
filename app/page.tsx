@@ -7,6 +7,7 @@ import SearchResults from '@/components/SearchResults';
 import AIOverview from '@/components/AIOverview';
 import type { GoogleSearchResponse, SearchResult } from '@/types/search';
 import { RRWebRecorder } from '@/components/RRWebRecorder';
+import { useSearchHistory } from '@/lib/use-search-history';
 
 function HomeContent() {
   const searchParams = useSearchParams();
@@ -22,6 +23,9 @@ function HomeContent() {
   
   // 从 URL 参数读取是否显示 AI Overview，默认显示
   const [showAIOverview, setShowAIOverview] = useState(true);
+  
+  // 搜索历史保存
+  const { saveSearchHistory } = useSearchHistory();
   
   useEffect(() => {
     // 大小写不敏感获取 ai 参数
@@ -56,11 +60,20 @@ function HomeContent() {
 
       const data: GoogleSearchResponse = await response.json();
       
-      setResults(data.items || []);
+      const searchResults = data.items || [];
+      setResults(searchResults);
       setSearchInfo({
         searchTime: data.searchInformation?.searchTime,
         totalResults: data.searchInformation?.formattedTotalResults,
       });
+
+      // 保存搜索历史（异步，不阻塞UI）
+      if (searchResults.length > 0) {
+        const mode = showAIOverview ? 'search_with_overview' : 'search';
+        saveSearchHistory(query, mode, searchResults).catch(err => {
+          console.error('Failed to save search history:', err);
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed, please try again later');
       setResults([]);
@@ -107,7 +120,16 @@ function HomeContent() {
 
         {/* AI Overview */}
         {showAIOverview && hasSearched && !isLoading && !error && results.length > 0 && (
-          <AIOverview query={currentQuery} results={results} />
+          <AIOverview 
+            query={currentQuery} 
+            results={results}
+            onAIResponseComplete={(aiResponse) => {
+              // 当AI回答完成时，保存带有AI回答的搜索历史
+              saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse).catch(err => {
+                console.error('Failed to save AI response:', err);
+              });
+            }}
+          />
         )}
 
         {/* Search Results */}

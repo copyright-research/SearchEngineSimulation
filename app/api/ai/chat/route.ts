@@ -2,6 +2,7 @@ import { groq } from '@ai-sdk/groq';
 import { streamText, UIMessage, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
+import { hybridSearch } from '@/lib/tavily-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import type { SearchResult } from '@/types/search';
 
@@ -64,14 +65,20 @@ export async function POST(req: NextRequest) {
       return new Response('Query is too long (max 500 characters)', { status: 400 });
     }
 
-    console.log('AI Chat request:', { query, messagesCount: messages.length });
+    // 检查是否启用 debug 模式
+    const url = new URL(req.url);
+    const debug = url.searchParams.get('debug') === 'true';
 
-    // 1. 执行 Google 搜索
+    console.log('AI Chat request:', { query, messagesCount: messages.length, debug });
+
+    // 1. 执行混合搜索（Google + Tavily）
     let searchResults: SearchResult[] = [];
     try {
-      const searchResponse = await searchGoogle(query);
-      searchResults = searchResponse.items || [];
-      console.log('Search completed:', { resultsCount: searchResults.length });
+      searchResults = await hybridSearch(query, async (q) => {
+        const response = await searchGoogle(q);
+        return response.items || [];
+      }, { includeSource: debug });
+      console.log('Hybrid search completed:', { resultsCount: searchResults.length });
     } catch (searchError) {
       console.error('Search error:', searchError);
       // 继续执行，但没有搜索结果

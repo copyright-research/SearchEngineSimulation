@@ -35,8 +35,8 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 2. 强制要求 / 和 /ai 必须带上 RID 参数（大小写不敏感）
-  const requireRIDPaths = ['/', '/ai'];
+  // 2. 强制要求 /, /ai, /verify 必须带上 RID 参数（大小写不敏感）
+  const requireRIDPaths = ['/', '/ai', '/verify'];
   if (requireRIDPaths.includes(request.nextUrl.pathname)) {
     const rid = getParamCaseInsensitive(request.nextUrl.searchParams, 'rid');
     
@@ -151,6 +151,7 @@ export const config = {
   matcher: [
     '/',
     '/ai',
+    '/verify',
     '/replay/:path*',
   ],
 };

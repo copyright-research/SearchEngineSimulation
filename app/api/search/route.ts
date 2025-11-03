@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
+import { hybridSearch } from '@/lib/tavily-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 
 // 全局每日限制（保护 Google API 免费额度）
@@ -82,11 +83,11 @@ export async function GET(request: NextRequest) {
 
     const startIndex = start ? parseInt(start, 10) : 1;
 
-    // 5. 执行搜索
-    const results = await searchGoogle(query, startIndex);
+    // 5. 执行 Google 搜索（organic 结果）
+    const googleResponse = await searchGoogle(query, startIndex);
 
     // 6. 返回结果，带上 Rate Limit 信息
-    return NextResponse.json(results, {
+    return NextResponse.json(googleResponse, {
       headers: {
         'X-RateLimit-Limit': '10',
         'X-RateLimit-Remaining': ipCheck.remaining.toString(),
