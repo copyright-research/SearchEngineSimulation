@@ -5,6 +5,7 @@ import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { hybridSearch } from '@/lib/tavily-search';
 import { searchGoogle } from '@/lib/google-search';
 import type { SearchResult } from '@/types/search';
+import { google } from '@ai-sdk/google';
 
 // Removed edge runtime as it's not compatible with the AI SDK
 // export const runtime = 'edge';
@@ -154,7 +155,7 @@ STRUCTURE REQUIREMENTS:
 Overview:`;
 
     const result = streamText({
-      model: groq('llama-3.3-70b-versatile'),
+      model: google('gemini-2.5-flash'),
       prompt,
       temperature: 0.7,
     });

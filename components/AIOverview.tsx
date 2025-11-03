@@ -214,7 +214,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">AI Overview</h3>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                {isLoading ? 'Generating summary...' : 'Powered by Gemini 2.5 Flash'}
+                {isLoading ? 'Generating summary...' : 'Powered by Groq AI'}
               </p>
             </div>
           </div>

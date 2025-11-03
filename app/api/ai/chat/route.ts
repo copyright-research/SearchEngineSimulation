@@ -1,9 +1,10 @@
-import { groq } from '@ai-sdk/groq';
+import { google } from '@ai-sdk/google';
 import { streamText, UIMessage, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
 import { hybridSearch } from '@/lib/tavily-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { generateSearchQuery, needsContext } from '@/lib/query-rewriter';
 import type { SearchResult } from '@/types/search';
 
 // Allow streaming responses up to 30 seconds
@@ -71,20 +72,33 @@ export async function POST(req: NextRequest) {
 
     console.log('AI Chat request:', { query, messagesCount: messages.length, debug });
 
-    // 1. 执行混合搜索（Google + Tavily）
+    // 1. 智能关键词生成：如果是上下文相关问题，生成优化的搜索查询
+    let searchQuery = query;
+    const historyMessages = messages.slice(0, -1); // 排除当前消息
+    
+    if (historyMessages.length > 0 && needsContext(query)) {
+      console.log('[AI Chat] Detected context-dependent query, rewriting...');
+      searchQuery = await generateSearchQuery(query, historyMessages);
+    }
+
+    // 2. 执行混合搜索（Google + Tavily）
     let searchResults: SearchResult[] = [];
     try {
-      searchResults = await hybridSearch(query, async (q) => {
+      searchResults = await hybridSearch(searchQuery, async (q) => {
         const response = await searchGoogle(q);
         return response.items || [];
       }, { includeSource: debug });
-      console.log('Hybrid search completed:', { resultsCount: searchResults.length });
+      console.log('Hybrid search completed:', { 
+        originalQuery: query,
+        searchQuery: searchQuery,
+        resultsCount: searchResults.length 
+      });
     } catch (searchError) {
       console.error('Search error:', searchError);
       // 继续执行，但没有搜索结果
     }
 
-    // 2. 构建 grounding context（仅当前查询的搜索结果）
+    // 3. 构建 grounding context（当前搜索结果）
     const context = searchResults
       .slice(0, 10)
       .map((result, index) => {
@@ -92,7 +106,7 @@ export async function POST(req: NextRequest) {
       })
       .join('\n\n');
 
-    // 3. 构建对话历史上下文（不包含搜索结果，只有问答内容）
+    // 4. 构建对话历史上下文（不包含搜索结果，只有问答内容）
     let conversationHistory = '';
     if (messages.length > 1) {
       // 获取除了最后一条消息外的所有历史消息
@@ -108,12 +122,16 @@ export async function POST(req: NextRequest) {
         }).join('\n\n');
     }
 
-    // 4. 构建系统提示词（Perplexity 风格 + 对话上下文）
+    // 5. 构建系统提示词（Perplexity 风格 + 对话上下文）
+    const searchQueryInfo = searchQuery !== query 
+      ? `\n(Search query optimized from: "${query}" to: "${searchQuery}")`
+      : '';
+    
     const systemPrompt = searchResults.length > 0
       ? `You are Perplexity AI - an advanced search-powered assistant that provides comprehensive, well-researched answers.
 ${conversationHistory}
 
-Search Results for current query: "${query}"
+Search Results for current query: "${query}"${searchQueryInfo}
 ${context}
 
 RESPONSE GUIDELINES:
@@ -123,6 +141,7 @@ RESPONSE GUIDELINES:
    - If the current query refers to previous discussion, acknowledge it naturally
    - Build upon previous answers when appropriate
    - Maintain consistency with earlier responses
+   - You can reference previous information naturally (e.g., "As mentioned earlier...", "Building on that...")
 
 2. STRUCTURE YOUR ANSWER:
    - Start with a direct, concise answer (1-2 paragraphs)
@@ -152,6 +171,7 @@ RESPONSE GUIDELINES:
    - Use \`code\` for technical terms if appropriate
    - Keep paragraphs concise (2-4 sentences)
    - Use clear section headings that match the query context
+   - No need to list the citation at the end.
 
 EXAMPLE:
 Next.js 15 introduces significant improvements to performance and developer experience [1, 2, 3]. The release focuses on React 19 support and enhanced caching mechanisms [4, 5].
@@ -173,7 +193,7 @@ Please provide a brief answer based on general knowledge and the conversation hi
 
     // 6. 调用 Groq AI 生成回答
     const result = streamText({
-      model: groq('llama-3.3-70b-versatile'),
+      model: google('gemini-2.5-flash'),
       system: systemPrompt,
       messages: modelMessages,
       temperature: 0.7,
@@ -187,9 +207,16 @@ Please provide a brief answer based on general knowledge and the conversation hi
     });
 
     // 7. 返回 UI Message Stream 响应（AI SDK 5 标准格式）
+    // 将搜索结果编码到响应头中（使用 UTF-8）
+    const sourcesToSend = searchResults.slice(0, 10);
+    const encodedSources = Buffer.from(JSON.stringify(sourcesToSend), 'utf-8').toString('base64');
+    
     return result.toUIMessageStreamResponse({
       headers: {
+        'X-Search-Results': encodedSources, // 搜索结果
         'X-Search-Results-Count': searchResults.length.toString(),
+        'X-Original-Query': Buffer.from(query, 'utf-8').toString('base64'),
+        'X-Optimized-Query': searchQuery !== query ? Buffer.from(searchQuery, 'utf-8').toString('base64') : '',
         'X-RateLimit-Limit': '20',
         'X-RateLimit-Remaining': rateLimitCheck.remaining.toString(),
         'X-RateLimit-Reset': new Date(rateLimitCheck.resetTime).toISOString(),

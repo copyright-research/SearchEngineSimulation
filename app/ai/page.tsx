@@ -14,10 +14,12 @@ import { useSearchHistory } from '@/lib/use-search-history';
 export default function AIModePage() {
   // 为每条消息存储对应的 sources（使用消息 ID 作为 key）
   const [messageSourcesMap, setMessageSourcesMap] = useState<Record<string, SearchResult[]>>({});
-  const [currentSources, setCurrentSources] = useState<SearchResult[]>([]);
   const [filteredSourceNumbers, setFilteredSourceNumbers] = useState<number[] | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null); // 追踪哪个消息的引用被点击了
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // 存储最新的响应头（用于获取 sources）
+  const latestResponseHeadersRef = useRef<Headers | null>(null);
   
   // 搜索历史保存
   const { saveSearchHistory } = useSearchHistory();
@@ -39,6 +41,12 @@ export default function AIModePage() {
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/ai/chat',
+      fetch: async (url, options) => {
+        const response = await fetch(url, options);
+        // 保存响应头
+        latestResponseHeadersRef.current = response.headers;
+        return response;
+      },
     }),
     onFinish: async (options) => {
       console.log('Message finished:', options.message);
@@ -51,7 +59,38 @@ export default function AIModePage() {
           .map((part) => ('text' in part ? part.text : ''))
           .join('');
         
-        const sources = messageSourcesMap[message.id] || currentSources;
+        // 从响应头中获取 sources
+        let sources: SearchResult[] = [];
+        if (latestResponseHeadersRef.current) {
+          const searchResultsHeader = latestResponseHeadersRef.current.get('X-Search-Results');
+          if (searchResultsHeader) {
+            try {
+              // 使用 TextDecoder 正确解码 UTF-8
+              const binaryString = atob(searchResultsHeader);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              const decodedString = new TextDecoder('utf-8').decode(bytes);
+              sources = JSON.parse(decodedString);
+              
+              console.log('Loaded sources from response header:', {
+                messageId: message.id,
+                sourcesCount: sources.length
+              });
+            } catch (decodeError) {
+              console.error('Failed to decode sources from header:', decodeError);
+            }
+          }
+        }
+        
+        // 保存到 map 中
+        if (sources.length > 0) {
+          setMessageSourcesMap(prev => ({
+            ...prev,
+            [message.id]: sources
+          }));
+        }
         
         // 获取对应的用户查询
         const userMessageIndex = messages.findIndex(m => m.id === message.id) - 1;
@@ -63,7 +102,7 @@ export default function AIModePage() {
             .join('');
           
           if (userQuery && sources.length > 0) {
-            saveSearchHistory('ai', userQuery, sources, textContent).catch(err => {
+            saveSearchHistory(userQuery, 'ai' as const, sources, textContent).catch(err => {
               console.error('Failed to save AI chat history:', err);
             });
           }
@@ -88,34 +127,14 @@ export default function AIModePage() {
     setActiveMessageId(null);
 
     // 发送消息给 AI（AI SDK 5 格式）
+    // Sources 会在 AI 响应的 data 字段中返回
     sendMessage({
       parts: [{ type: 'text', text: userInput }],
     });
     
     setInput(''); // 清空输入框
-
-    // 同时获取搜索结果，并在收到后关联到即将生成的 AI 消息
-    fetchSourcesForQuery(userInput);
   };
 
-  // 获取搜索结果作为 sources
-  const fetchSourcesForQuery = async (query: string) => {
-    try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.items) {
-          // 设置为当前显示的 sources
-          setCurrentSources(data.items);
-          
-          // 等待下一条 AI 消息生成后，将 sources 关联到该消息
-          // 这个会在 useEffect 中处理
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch sources:', error);
-    }
-  };
 
   // 自动滚动逻辑 - 基于 Stack Overflow dotnetCarpenter 的方案
   // 只有用户在底部时才自动滚动，用户滚上去后停止
@@ -161,21 +180,7 @@ export default function AIModePage() {
     }
   }, [messages, status, isUserAtBottom]);
 
-  // 当有新的 AI 消息时，关联 sources
-  useEffect(() => {
-    if (messages.length > 0 && currentSources.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      // 只为 assistant 消息关联 sources，且该消息还没有关联过
-      if (lastMessage.role === 'assistant' && !messageSourcesMap[lastMessage.id]) {
-        setMessageSourcesMap((prev) => ({
-          ...prev,
-          [lastMessage.id]: currentSources,
-        }));
-      }
-    }
-    // 移除 messageSourcesMap 依赖，避免循环更新
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, currentSources]);
+  // Sources 现在直接从 AI 响应的 data 字段中获取，不再需要单独关联
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50">
@@ -242,7 +247,7 @@ export default function AIModePage() {
                     onClick={() => {
                       setFilteredSourceNumbers(null);
                       setActiveMessageId(null);
-                      fetchSourcesForQuery(example);
+                      // Sources 会在 AI 响应中返回
                       sendMessage({
                         parts: [{ type: 'text', text: example }],
                       });
@@ -314,7 +319,6 @@ export default function AIModePage() {
                                     console.log('Current message sources:', messageSources);
                                     // 更新当前显示的 sources 为该消息的 sources
                                     setActiveMessageId(message.id);
-                                    setCurrentSources(messageSources);
                                     setFilteredSourceNumbers(numbers);
                                   }}
                                 >

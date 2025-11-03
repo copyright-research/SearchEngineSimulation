@@ -9,6 +9,10 @@ A modern, fast, and elegant search engine powered by Google Custom Search API, b
 ## ✨ Features
 
 - 🤖 **AI Overview**: Intelligent summaries powered by GROQ GPT-4o-mini
+- 🔍 **Hybrid Search**: Combines Google Search + Tavily for better results
+- 🐛 **Debug Mode**: Show search result sources (Tavily vs Google)
+- 🎯 **User Verification**: AI-generated questions to verify user engagement
+- 💾 **Search History**: PostgreSQL/SQLite-backed search history and analytics
 - 🎨 **Beautiful UI**: Modern gradient design with smooth animations
 - ⚡ **Fast**: Server-side rendering with Next.js App Router
 - 🔒 **Secure**: Built-in rate limiting and API protection
@@ -41,10 +45,14 @@ Edit `.env.local` and add your credentials:
 GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id_here
 GROQ_API_KEY=your_GROQ_api_key_here
+TAVILY_API_KEY=your_tavily_api_key_here  # Optional, for enhanced search
+USE_SQLITE=true  # Use SQLite for local development
 ```
 
 See [SETUP.md](./SETUP.md) for detailed instructions on obtaining Google API keys.
 See [AI_OVERVIEW.md](./AI_OVERVIEW.md) for AI Overview setup and configuration.
+See [TAVILY_INTEGRATION.md](./TAVILY_INTEGRATION.md) for Tavily API setup.
+See [DEBUG_MODE.md](./DEBUG_MODE.md) for debug mode usage.
 
 3. **Run the development server**:
 ```bash
@@ -64,6 +72,18 @@ This project includes multiple layers of security:
 - ✅ **Security Headers**: XSS, clickjacking protection
 
 See [SECURITY.md](./SECURITY.md) for detailed security configuration.
+
+## 🎯 User Verification System
+
+This project includes an AI-powered user engagement verification system that generates questions based on search results to ensure users are actively engaging with the content.
+
+**Key Features:**
+- Automatic question generation (3-5 questions per search)
+- Support for all three modes: AI, search, and search with overview
+- PostgreSQL database for storing history and questions
+- Beautiful verification UI with real-time statistics
+
+See [VERIFICATION_QUESTIONS.md](./VERIFICATION_QUESTIONS.md) for detailed documentation.
 
 ### Current Limits
 
