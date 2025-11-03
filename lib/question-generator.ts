@@ -79,7 +79,7 @@ Question types can include:
 - Source identification (which search result mentioned certain information)
 - Detail recall (specific details from search results)
 
-Generate questions in Chinese.`;
+Generate questions in English.`;
 
     // 使用 Gemini 2.0 Flash 生成结构化问题
     const result = await generateObject({
