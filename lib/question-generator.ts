@@ -45,41 +45,41 @@ export async function generateVerificationQuestions(
       link: result.link,
     }));
 
-    // 构建提示词
-    const prompt = `你是一个专业的问题生成助手。基于用户的搜索查询和搜索结果，生成3-5个选择题来验证用户是否真的阅读和理解了内容。
+    // Build the prompt
+    const prompt = `You are a professional question generator. Based on the user's search query and search results, generate 3-5 multiple-choice questions to verify whether the user has actually read and understood the content.
 
-用户搜索查询: "${query}"
-搜索模式: ${mode || 'search'}
+User Search Query: "${query}"
+Search Mode: ${mode || 'search'}
 
-搜索结果:
-${searchContext.map(r => `${r.index}. ${r.title}\n   ${r.snippet}\n   来源: ${r.link}`).join('\n\n')}
+Search Results:
+${searchContext.map(r => `${r.index}. ${r.title}\n   ${r.snippet}\n   Source: ${r.link}`).join('\n\n')}
 
-${aiResponse ? `\nAI 生成的回答:\n${aiResponse}\n` : ''}
+${aiResponse ? `\nAI Generated Response:\n${aiResponse}\n` : ''}
 
-请生成3-5个选择题，要求：
-1. 问题应该基于搜索结果的实际内容
-2. 问题应该测试用户是否真的阅读了结果，而不是随便点击
-3. 每个问题有4个选项，只有1个正确答案
-4. **重要**：correctAnswer 必须是 0、1、2 或 3（数组索引，从0开始）
-5. 问题难度适中，不要太简单也不要太难
-6. 避免生成可以通过常识回答的问题
-7. 问题应该具体、明确，避免模糊不清
-8. 选项应该有一定的迷惑性，但不要过于相似
-9. 优先基于搜索结果的标题、摘要和AI回答中的关键信息
+Generate 3-5 multiple-choice questions with the following requirements:
+1. Questions should be based on the actual content of the search results
+2. Questions should test whether the user actually read the results, not just clicked randomly
+3. Each question has 4 options, with only 1 correct answer
+4. **IMPORTANT**: correctAnswer must be 0, 1, 2, or 3 (array index, starting from 0)
+5. Questions should be moderately difficult - not too easy, not too hard
+6. Avoid questions that can be answered with common sense alone
+7. Questions should be specific and clear, avoiding ambiguity
+8. Options should have some level of distraction, but not be too similar
+9. Prioritize key information from search result titles, snippets, and AI responses
 
-**答案索引说明**：
-- 第1个选项（options[0]）→ correctAnswer: 0
-- 第2个选项（options[1]）→ correctAnswer: 1
-- 第3个选项（options[2]）→ correctAnswer: 2
-- 第4个选项（options[3]）→ correctAnswer: 3
+**Answer Index Explanation**:
+- First option (options[0]) → correctAnswer: 0
+- Second option (options[1]) → correctAnswer: 1
+- Third option (options[2]) → correctAnswer: 2
+- Fourth option (options[3]) → correctAnswer: 3
 
-问题类型可以包括：
-- 事实性问题（基于搜索结果中的具体信息）
-- 理解性问题（测试对内容的理解）
-- 来源识别（哪个搜索结果提到了某个信息）
-- 细节记忆（搜索结果中的具体细节）
+Question types can include:
+- Factual questions (based on specific information in search results)
+- Comprehension questions (testing understanding of content)
+- Source identification (which search result mentioned certain information)
+- Detail recall (specific details from search results)
 
-请用中文生成问题。`;
+Generate questions in Chinese.`;
 
     // 使用 Gemini 2.0 Flash 生成结构化问题
     const result = await generateObject({

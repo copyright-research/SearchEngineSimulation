@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVerificationQuestions, saveUserAnswer, getUserAnswerStats } from '@/lib/db-adapter';
+import { getVerificationQuestions, saveUserAnswer, getUserAnswerStats } from '@/lib/db';
 
 /**
  * 获取验证问题
@@ -72,10 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 保存答案
-    const result = await saveUserAnswer(rid, questionId, answer) as unknown as { 
-      is_correct: boolean; 
-      correct_answer: number; 
-    };
+    const result = await saveUserAnswer(rid, questionId, answer);
 
     return NextResponse.json({
       success: true,

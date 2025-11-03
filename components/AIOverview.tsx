@@ -185,6 +185,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
         abortControllerRef.current.abort();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, results]);
 
   if (error || (!isLoading && !completion)) {

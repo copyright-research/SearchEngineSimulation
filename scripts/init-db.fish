@@ -28,12 +28,12 @@ end
 
 # 询问环境
 echo -e "$YELLOW请选择环境:$NC"
-echo "1) 本地开发 (http://localhost:3000)"
+echo "1) 本地开发 (http://localhost:3001)"
 echo "2) 生产环境 (自定义URL)"
 read -P "请输入选项 (1 或 2): " env_choice
 
 if test "$env_choice" = "1"
-    set BASE_URL "http://localhost:3000"
+    set BASE_URL "http://localhost:3001"
 else if test "$env_choice" = "2"
     read -P "请输入生产环境URL (例如: https://your-app.vercel.app): " BASE_URL
 else

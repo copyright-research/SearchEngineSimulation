@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveSearchHistory, saveVerificationQuestions } from '@/lib/db-adapter';
+import { saveSearchHistory, saveVerificationQuestions } from '@/lib/db';
 import { generateVerificationQuestions } from '@/lib/question-generator';
 import type { SearchResult } from '@/types/search';
 
@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
     // 异步生成验证问题（不阻塞响应）
     generateAndSaveQuestions(
       rid,
-      searchHistory.id,
       query,
       results,
       aiResponse,
@@ -79,7 +78,6 @@ export async function POST(request: NextRequest) {
  */
 async function generateAndSaveQuestions(
   rid: string,
-  searchHistoryId: number,
   query: string,
   results: SearchResult[],
   aiResponse: string | undefined,
@@ -97,13 +95,12 @@ async function generateAndSaveQuestions(
     );
 
     // 保存到数据库
-    const savedQuestions = await saveVerificationQuestions(
+    await saveVerificationQuestions(
       rid,
-      searchHistoryId,
       questionsResponse.questions
     );
 
-    console.log(`Generated and saved ${savedQuestions.length} questions for RID: ${rid}`);
+    console.log(`Generated and saved ${questionsResponse.questions.length} questions for RID: ${rid}`);
   } catch (error) {
     console.error('Failed to generate and save questions:', error);
     throw error;

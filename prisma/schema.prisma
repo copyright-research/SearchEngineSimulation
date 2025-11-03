@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model click_events {
+  id               Int          @id @default(autoincrement())
+  task_record_id   Int
+  task_id          String
+  click_order      Int
+  page_title       String
+  page_id          String
+  position_in_serp String
+  click_time       DateTime     @db.Timestamptz(6)
+  dwell_time_sec   Float?
+  from_overview    Boolean
+  from_ai_mode     Boolean
+  sponsored        Boolean?     @default(false)
+  page_context     String?
+  task_records     task_records @relation(fields: [task_record_id], references: [id], onDelete: Cascade)
+}
+
+model page_engagements {
+  id                 Int          @id @default(autoincrement())
+  task_record_id     Int          @unique
+  user_agent         String
+  client_ip          String?
+  total_time_on_task Int
+  active_time        Int
+  idle_time          Int
+  visibility_changes Int          @default(0)
+  max_scroll_depth   Int          @default(0)
+  interactions       Int          @default(0)
+  engagement_rate    Float
+  session_start      DateTime     @db.Timestamptz(6)
+  last_activity      DateTime     @db.Timestamptz(6)
+  created_at         DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime     @db.Timestamptz(6)
+  task_records       task_records @relation(fields: [task_record_id], references: [id], onDelete: Cascade)
+}
+
+model show_all_content_clicks {
+  id             Int          @id @default(autoincrement())
+  task_record_id Int
+  task_id        String
+  click_order    Int
+  component_name String
+  click_time     DateTime     @db.Timestamptz(6)
+  page_context   String?
+  task_records   task_records @relation(fields: [task_record_id], references: [id], onDelete: Cascade)
+}
+
+model show_all_references_clicks {
+  id                        Int          @id @default(autoincrement())
+  task_record_id            Int
+  task_id                   String
+  click_order               Int
+  component_name            String
+  click_time                DateTime     @db.Timestamptz(6)
+  page_context              String?
+  filter_reference_indexes  Int[]        @default([])
+  global_reference_index    Int?
+  text_block_content        String?
+  filtered_references_count Int?
+  task_records              task_records @relation(fields: [task_record_id], references: [id], onDelete: Cascade)
+}
+
+model task_records {
+  id                         Int                          @id @default(autoincrement())
+  participant_id             String
+  treatment_group            String
+  task_id                    String                       @unique
+  task_topic                 String
+  task_type                  String
+  task_start_time            DateTime                     @db.Timestamptz(6)
+  page_click_statics_1       Int?                         @default(0)
+  page_click_statics_2       Int?                         @default(0)
+  page_click_statics_3       Int?                         @default(0)
+  page_click_statics_4       Int?                         @default(0)
+  click_events               click_events[]
+  page_engagements           page_engagements?
+  show_all_content_clicks    show_all_content_clicks[]
+  show_all_references_clicks show_all_references_clicks[]
+}
+
+// 搜索会话表
+model SearchSession {
+  id        Int      @id @default(autoincrement())
+  rid       String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  searchHistories      SearchHistory[]
+  verificationQuestions VerificationQuestion[]
+  userAnswers          UserAnswer[]
+
+  @@map("search_sessions")
+}
+
+// 搜索历史表
+model SearchHistory {
+  id          Int      @id @default(autoincrement())
+  sessionId   Int      @map("session_id")
+  query       String
+  mode        String   // 'search' | 'search_with_overview' | 'ai'
+  results     Json     // 存储搜索结果数组
+  aiResponse  String?  @map("ai_response") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  session     SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@map("search_history")
+}
+
+// 验证问题表
+model VerificationQuestion {
+  id            Int      @id @default(autoincrement())
+  sessionId     Int      @map("session_id")
+  question      String   @db.Text
+  options       Json     // 存储选项数组 [string, string, string, string]
+  correctAnswer Int      @map("correct_answer") // 0-3
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  session       SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userAnswers   UserAnswer[]
+  
+  @@index([sessionId])
+  @@map("verification_questions")
+}
+
+// 用户答案表
+model UserAnswer {
+  id            Int      @id @default(autoincrement())
+  sessionId     Int      @map("session_id")
+  questionId    Int      @map("question_id")
+  userAnswer    Int      @map("user_answer")
+  isCorrect     Boolean  @map("is_correct")
+  answeredAt    DateTime @default(now()) @map("answered_at")
+  
+  session       SearchSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question      VerificationQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+  @@index([questionId])
+  @@map("user_answers")
+}

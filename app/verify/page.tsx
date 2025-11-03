@@ -42,6 +42,7 @@ function VerifyContent() {
     }
 
     fetchQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rid]);
 
   const fetchQuestions = async () => {
