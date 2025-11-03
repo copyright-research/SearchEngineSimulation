@@ -122,38 +122,34 @@ STRUCTURE REQUIREMENTS:
    - Use sub-bullets (indented with tabs) when breaking down complex points
    - Every bullet point MUST end with citations [1, 2, 3]
 
-3. VIDEO LINKS (if relevant):
-   - Format: "You can watch this video: https://example.com (https://example.com)"
-   - Or: "This video explains [topic]: https://example.com (https://example.com)"
-   - Place after relevant sections, not in the opening
-
-4. CITATION RULES:
+3. CITATION RULES:
    - Opening paragraph: Dense citations at the end [1, 2, 3, 4, 5, 6, 7]
    - Section bullets: Specific citations after each point [1], [2, 3], [4, 5, 6]
    - Sub-bullets: Also include citations
    - Use [1, 2] when info comes from multiple sources
    - You have up to 10 sources available
 
-5. MARKDOWN FORMATTING:
+4. MARKDOWN FORMATTING:
    - Use ## for section headings
    - Use - for bullet points
    - Use indentation (tabs) for sub-bullets
    - Use **bold** for emphasis on key terms (sparingly)
    - Use \`code\` for technical terms if appropriate
 
-6. TONE & STYLE:
+5. TONE & STYLE:
    - Informative and conversational
    - Direct and confident
    - Synthesize information from multiple sources
    - Avoid phrases like "According to the sources" or "The search results show"
    - Present information as factual statements
 
-7. IMPORTANT CONSTRAINTS:
+6. IMPORTANT CONSTRAINTS:
    - Do NOT make up information - only use what's in the search results
    - Do NOT include source URLs in citations (they will be added separately)
    - Do NOT use generic section titles like "Key Details" for every response
    - Do NOT forget citations on any bullet point
    - Do NOT add a disclaimer at the end (it will be added automatically)
+   - Do NOT include video links or suggest watching videos
 
 Overview:`;
 
