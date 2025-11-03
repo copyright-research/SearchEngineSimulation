@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 import { NextRequest } from 'next/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
@@ -154,7 +154,7 @@ STRUCTURE REQUIREMENTS:
 Overview:`;
 
     const result = streamText({
-      model: google('gemini-2.5-flash'),
+      model: groq('openai/gpt-oss-120b'),
       prompt,
       temperature: 0.7,
     });

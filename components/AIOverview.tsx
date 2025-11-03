@@ -32,8 +32,8 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
       return;
     }
 
-    // 匹配所有引用 [1], [1, 2], [1, 2, 3] 等
-    const citationRegex = /\[(\d+(?:,\s*\d+)*)\]/g;
+    // 匹配所有引用 [1], [1, 2], [1, 2, 3] 和 【1】, 【1, 2】 等
+    const citationRegex = /[\[【](\d+(?:,\s*\d+)*)[\]】]/g;
     const cited = new Set<number>();
     let match;
 

@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 import { generateText } from 'ai';
 import type { UIMessage } from 'ai';
 
@@ -71,7 +71,7 @@ IMPORTANT:
 Optimized Search Query:`;
 
     const result = await generateText({
-      model: google('gemini-2.5-flash'),
+      model: groq('openai/gpt-oss-120b'),
       prompt,
       temperature: 0.3, // 低温度以保持一致性
     });

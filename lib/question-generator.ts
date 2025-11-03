@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { SearchResult } from '@/types/search';
@@ -83,7 +83,7 @@ Generate questions in Chinese.`;
 
     // 使用 Gemini 2.0 Flash 生成结构化问题
     const result = await generateObject({
-      model: google('gemini-2.0-flash-exp'),
+      model: groq('openai/gpt-oss-120b'),
       schema: QuestionsResponseSchema,
       prompt,
       temperature: 0.7,

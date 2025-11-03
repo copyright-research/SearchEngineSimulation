@@ -1,4 +1,4 @@
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 import { streamText, UIMessage, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
@@ -193,7 +193,7 @@ Please provide a brief answer based on general knowledge and the conversation hi
 
     // 6. 调用 Groq AI 生成回答
     const result = streamText({
-      model: google('gemini-2.5-flash'),
+      model: groq('openai/gpt-oss-120b'),
       system: systemPrompt,
       messages: modelMessages,
       temperature: 0.7,

@@ -12,8 +12,8 @@ const processText = (
   text: string,
   onCitationClick?: (citationNumbers: number[]) => void
 ) => {
-  // 匹配 [1], [1, 2], [1, 2, 3] 等格式
-  const citationRegex = /\[(\d+(?:,\s*\d+)*)\]/g;
+  // 匹配 [1], [1, 2], [1, 2, 3] 和 【1】, 【1, 2】 等格式
+  const citationRegex = /[\[【](\d+(?:,\s*\d+)*)[\]】]/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match;
@@ -97,6 +97,28 @@ const CustomListItem = ({
   return <li>{processChildren(children, onCitationClick)}</li>;
 };
 
+// 自定义表格单元格组件
+const CustomTableCell = ({ 
+  children, 
+  onCitationClick 
+}: { 
+  children: React.ReactNode;
+  onCitationClick?: (citationNumbers: number[]) => void;
+}) => {
+  return <td>{processChildren(children, onCitationClick)}</td>;
+};
+
+// 自定义表格头单元格组件
+const CustomTableHeader = ({ 
+  children, 
+  onCitationClick 
+}: { 
+  children: React.ReactNode;
+  onCitationClick?: (citationNumbers: number[]) => void;
+}) => {
+  return <th>{processChildren(children, onCitationClick)}</th>;
+};
+
 export const Response = memo(
   ({ onCitationClick, ...props }: ResponseProps) => (
     <Streamdown
@@ -111,6 +133,16 @@ export const Response = memo(
           <CustomListItem onCitationClick={onCitationClick}>
             {children}
           </CustomListItem>
+        ),
+        td: ({ children }) => (
+          <CustomTableCell onCitationClick={onCitationClick}>
+            {children}
+          </CustomTableCell>
+        ),
+        th: ({ children }) => (
+          <CustomTableHeader onCitationClick={onCitationClick}>
+            {children}
+          </CustomTableHeader>
         ),
       }}
       {...props}
