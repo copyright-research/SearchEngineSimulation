@@ -60,7 +60,7 @@ export async function getSearchHistory(rid: string) {
 }
 
 /**
- * 保存验证问题
+ * 保存验证问题（覆盖旧问题）
  */
 export async function saveVerificationQuestions(
   rid: string,
@@ -72,16 +72,25 @@ export async function saveVerificationQuestions(
 ) {
   const session = await getOrCreateSession(rid);
 
-  const createdQuestions = await prisma.verificationQuestion.createMany({
-    data: questions.map((q) => ({
-      sessionId: session.id,
-      question: q.question,
-      options: JSON.parse(JSON.stringify(q.options)),
-      correctAnswer: q.correctAnswer,
-    })),
+  // 使用事务：先删除该 session 的所有旧问题，再创建新问题
+  await prisma.$transaction(async (tx) => {
+    // 1. 删除该 session 的所有旧问题（级联删除会自动删除关联的 userAnswers）
+    await tx.verificationQuestion.deleteMany({
+      where: { sessionId: session.id },
+    });
+
+    // 2. 创建新问题
+    await tx.verificationQuestion.createMany({
+      data: questions.map((q) => ({
+        sessionId: session.id,
+        question: q.question,
+        options: JSON.parse(JSON.stringify(q.options)),
+        correctAnswer: q.correctAnswer,
+      })),
+    });
   });
 
-  return createdQuestions;
+  console.log(`[DB] Replaced all questions for RID: ${rid} with ${questions.length} new questions`);
 }
 
 /**
