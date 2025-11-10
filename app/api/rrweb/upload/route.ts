@@ -57,9 +57,54 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[rrweb] Upload error:', error);
+    // 详细的错误日志
+    console.error('[rrweb] Upload error - Full details:');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    
+    // 如果是 AWS SDK 错误，打印更多细节
+    if (error && typeof error === 'object') {
+      console.error('Error code:', (error as any).code);
+      console.error('Error name:', (error as any).name);
+      console.error('Error $metadata:', JSON.stringify((error as any).$metadata, null, 2));
+      
+      // AggregateError 特殊处理
+      if (error instanceof AggregateError) {
+        console.error('AggregateError - Individual errors:');
+        error.errors.forEach((err, index) => {
+          console.error(`  Error ${index + 1}:`, err);
+          if (err && typeof err === 'object') {
+            console.error(`    Code: ${(err as any).code}`);
+            console.error(`    Message: ${(err as any).message}`);
+            console.error(`    Stack: ${(err as any).stack}`);
+          }
+        });
+      }
+      
+      // 打印完整的错误对象（用于调试）
+      console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    }
+    
+    // 打印堆栈跟踪
+    if (error instanceof Error && error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
+    
+    // 打印环境变量状态（不打印实际值，只打印是否存在）
+    console.error('R2 Config Status:', {
+      hasEndpoint: !!process.env.R2_ENDPOINT,
+      hasAccessKeyId: !!process.env.R2_ACCESS_KEY_ID,
+      hasSecretAccessKey: !!process.env.R2_SECRET_ACCESS_KEY,
+      hasBucket: !!process.env.R2_BUCKET,
+      endpoint: process.env.R2_ENDPOINT ? `${process.env.R2_ENDPOINT.substring(0, 20)}...` : 'not set',
+    });
+    
     return NextResponse.json(
-      { error: 'Failed to upload recording chunk' },
+      { 
+        error: 'Failed to upload recording chunk',
+        details: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+      },
       { status: 500 }
     );
   }
@@ -164,9 +209,28 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[rrweb] Fetch error:', error);
+    // 详细的错误日志
+    console.error('[rrweb] Fetch error - Full details:');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    
+    if (error && typeof error === 'object') {
+      console.error('Error code:', (error as any).code);
+      console.error('Error name:', (error as any).name);
+      console.error('Error $metadata:', JSON.stringify((error as any).$metadata, null, 2));
+      console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    }
+    
+    if (error instanceof Error && error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to fetch recording' },
+      { 
+        error: 'Failed to fetch recording',
+        details: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+      },
       { status: 500 }
     );
   }

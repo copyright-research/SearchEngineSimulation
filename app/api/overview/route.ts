@@ -1,9 +1,9 @@
-import { groq } from '@ai-sdk/groq';
 import { streamText } from 'ai';
 import { NextRequest } from 'next/server';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { hybridSearch } from '@/lib/tavily-search';
 import { searchGoogle } from '@/lib/google-search';
+import { getOverviewModel } from '@/lib/ai-model';
 import type { SearchResult } from '@/types/search';
 
 // Removed edge runtime as it's not compatible with the AI SDK
@@ -16,10 +16,14 @@ const overviewLimiter = rateLimit({
 });
 
 export async function POST(req: NextRequest) {
+  const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  console.log(`[Overview API ${requestId}] 📥 Request received`);
+  
   try {
     // 1. Rate limiting 检查
     const clientIp = getClientIp(req);
     const rateLimitCheck = overviewLimiter.check(clientIp);
+    console.log(`[Overview API ${requestId}] Client IP: ${clientIp}, Rate limit remaining: ${rateLimitCheck.remaining}`);
 
     if (!rateLimitCheck.success) {
       const resetDate = new Date(rateLimitCheck.resetTime);
@@ -65,12 +69,14 @@ export async function POST(req: NextRequest) {
     const { query, results } = body;
 
     if (!query) {
-      console.error('Invalid request data: missing query');
+      console.error(`[Overview API ${requestId}] ❌ Invalid request data: missing query`);
       return new Response('Invalid request: missing query', { status: 400 });
     }
 
+    console.log(`[Overview API ${requestId}] 📝 Query: "${query}", Results count: ${results?.length || 0}`);
+
     // 使用混合搜索（Google + Tavily）获取更高质量的结果用于 AI Overview
-    console.log('[AI Overview] Using hybrid search for:', query);
+    console.log(`[Overview API ${requestId}] 🔍 Using hybrid search for:`, query);
     let enhancedResults: SearchResult[] = [];
     
     try {
@@ -79,15 +85,15 @@ export async function POST(req: NextRequest) {
         const response = await searchGoogle(q);
         return response.items || [];
       }, { includeSource: true }); // 启用来源标记
-      console.log('[AI Overview] Enhanced results count:', enhancedResults.length);
+      console.log(`[Overview API ${requestId}] ✅ Enhanced results count:`, enhancedResults.length);
     } catch (error) {
-      console.error('[AI Overview] Hybrid search failed, falling back to provided results:', error);
+      console.error(`[Overview API ${requestId}] ⚠️ Hybrid search failed, falling back to provided results:`, error);
       // 如果混合搜索失败，使用前端传来的 Google 结果
       enhancedResults = results || [];
     }
 
     if (enhancedResults.length === 0) {
-      console.error('No results available for AI Overview');
+      console.error(`[Overview API ${requestId}] ❌ No results available for AI Overview`);
       return new Response('No search results available', { status: 400 });
     }
 
@@ -153,14 +159,20 @@ STRUCTURE REQUIREMENTS:
 
 Overview:`;
 
+    console.log(`[Overview API ${requestId}] 🤖 Starting AI generation...`);
+    
+    const model = getOverviewModel();
+    
     const result = streamText({
-      model: groq('openai/gpt-oss-120b'),
+      model,
       prompt,
       temperature: 0.7,
     });
 
     // 将混合搜索结果编码到响应头中（使用 UTF-8）
     const encodedResults = Buffer.from(JSON.stringify(enhancedResults.slice(0, 10)), 'utf-8').toString('base64');
+
+    console.log(`[Overview API ${requestId}] 📤 Sending stream response`);
 
     return result.toTextStreamResponse({
       headers: {
@@ -171,7 +183,7 @@ Overview:`;
       },
     });
   } catch (error) {
-    console.error('AI Overview error:', error);
+    console.error(`[Overview API ${requestId}] ❌ Error:`, error);
     return new Response('Error generating overview', { status: 500 });
   }
 }

@@ -44,43 +44,86 @@ export async function put(
     addRandomSuffix?: boolean;
   }
 ) {
-  validateR2Config();
+  try {
+    validateR2Config();
 
-  // 处理路径
-  const finalPath = path;
-  // 注意: 如果将来需要添加随机后缀，可以在这里实现
-  // if (options?.addRandomSuffix === true) {
-  //   finalPath = `${path}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  // }
+    // 处理路径
+    const finalPath = path;
+    // 注意: 如果将来需要添加随机后缀，可以在这里实现
+    // if (options?.addRandomSuffix === true) {
+    //   finalPath = `${path}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    // }
 
-  // 准备内容
-  const body = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content;
+    // 准备内容
+    const body = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content;
 
-  // 上传到 R2
-  const command = new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: finalPath,
-    Body: body,
-    ContentType: options?.contentType || 'application/octet-stream',
-    // R2 默认是私有的，如果需要公开访问，需要配置 bucket 的公开访问策略
-    // 或者使用预签名 URL
-  });
+    console.log(`[R2] Uploading to path: ${finalPath}, size: ${body.length} bytes`);
 
-  await r2Client.send(command);
+    // 上传到 R2
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: finalPath,
+      Body: body,
+      ContentType: options?.contentType || 'application/octet-stream',
+      // R2 默认是私有的，如果需要公开访问，需要配置 bucket 的公开访问策略
+      // 或者使用预签名 URL
+    });
 
-  // 构建公开 URL
-  // R2 公开访问有两种方式：
-  // 1. 使用 R2.dev 子域名: https://<bucket>.r2.dev/<path>
-  // 2. 使用自定义域名: https://<custom-domain>/<path>
-  // 注意: R2_ENDPOINT 是 S3 API 端点，不是公开访问 URL
-  const publicUrl = `https://${BUCKET_NAME}.r2.dev/${finalPath}`;
+    await r2Client.send(command);
 
-  return {
-    url: publicUrl,
-    pathname: finalPath,
-    contentType: options?.contentType || 'application/octet-stream',
-    uploadedAt: new Date(),
-  };
+    // 构建公开 URL
+    // R2 公开访问有两种方式：
+    // 1. 使用 R2.dev 子域名: https://<bucket>.r2.dev/<path>
+    // 2. 使用自定义域名: https://<custom-domain>/<path>
+    // 注意: R2_ENDPOINT 是 S3 API 端点，不是公开访问 URL
+    const publicUrl = `https://${BUCKET_NAME}.r2.dev/${finalPath}`;
+
+    console.log(`[R2] Upload successful: ${publicUrl}`);
+
+    return {
+      url: publicUrl,
+      pathname: finalPath,
+      contentType: options?.contentType || 'application/octet-stream',
+      uploadedAt: new Date(),
+    };
+  } catch (error) {
+    console.error('[R2] Upload failed - Full details:');
+    console.error('Path:', path);
+    console.error('Content size:', typeof content === 'string' ? content.length : content.length, 'bytes');
+    console.error('Error type:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    
+    if (error && typeof error === 'object') {
+      console.error('Error code:', (error as any).code);
+      console.error('Error name:', (error as any).name);
+      console.error('Error $metadata:', JSON.stringify((error as any).$metadata, null, 2));
+      
+      // AggregateError 特殊处理
+      if (error instanceof AggregateError) {
+        console.error('AggregateError - Individual errors:');
+        error.errors.forEach((err, index) => {
+          console.error(`  Error ${index + 1}:`, err);
+          if (err && typeof err === 'object') {
+            console.error(`    Code: ${(err as any).code}`);
+            console.error(`    Message: ${(err as any).message}`);
+          }
+        });
+      }
+    }
+    
+    if (error instanceof Error && error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
+    
+    console.error('R2 Client Config:', {
+      endpoint: process.env.R2_ENDPOINT,
+      bucket: BUCKET_NAME,
+      hasAccessKeyId: !!process.env.R2_ACCESS_KEY_ID,
+      hasSecretAccessKey: !!process.env.R2_SECRET_ACCESS_KEY,
+    });
+    
+    throw error;
+  }
 }
 
 /**

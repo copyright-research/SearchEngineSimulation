@@ -1,6 +1,6 @@
-import { groq } from '@ai-sdk/groq';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { getQuestionGeneratorModel } from '@/lib/ai-model';
 import type { SearchResult } from '@/types/search';
 
 /**
@@ -81,9 +81,11 @@ Question types can include:
 
 Generate questions in English.`;
 
-    // 使用 Gemini 2.0 Flash 生成结构化问题
+    // 使用 AI 模型生成结构化问题
+    const model = getQuestionGeneratorModel();
+    
     const result = await generateObject({
-      model: groq('openai/gpt-oss-120b'),
+      model,
       schema: QuestionsResponseSchema,
       prompt,
       temperature: 0.7,

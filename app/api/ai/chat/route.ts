@@ -1,6 +1,6 @@
-import { groq } from '@ai-sdk/groq';
 import { streamText, UIMessage, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
+import { getChatModel } from '@/lib/ai-model';
 import { searchGoogle } from '@/lib/google-search';
 import { hybridSearch } from '@/lib/tavily-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
@@ -191,9 +191,11 @@ Please provide a brief answer based on general knowledge and the conversation hi
     // 将 UIMessage 转换为 ModelMessage
     const modelMessages = convertToModelMessages(messages);
 
-    // 6. 调用 Groq AI 生成回答
+    // 6. 调用 AI 模型生成回答
+    const model = getChatModel();
+    
     const result = streamText({
-      model: groq('openai/gpt-oss-120b'),
+      model,
       system: systemPrompt,
       messages: modelMessages,
       temperature: 0.7,

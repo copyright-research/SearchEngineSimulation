@@ -1,6 +1,6 @@
-import { groq } from '@ai-sdk/groq';
 import { generateText } from 'ai';
 import type { UIMessage } from 'ai';
+import { getQueryRewriterModel } from '@/lib/ai-model';
 
 /**
  * 基于对话历史和当前问题生成优化的搜索关键词
@@ -70,8 +70,10 @@ IMPORTANT:
 
 Optimized Search Query:`;
 
+    const model = getQueryRewriterModel();
+    
     const result = await generateText({
-      model: groq('openai/gpt-oss-120b'),
+      model,
       prompt,
       temperature: 0.3, // 低温度以保持一致性
     });

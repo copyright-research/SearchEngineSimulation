@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
 import type { SearchResult } from '@/types/search';
+import { useDebugDepsDeep } from '@/lib/use-debug-deps';
 
 interface AIOverviewProps {
   query: string;
@@ -24,6 +25,10 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
   const [enhancedResults, setEnhancedResults] = useState<SearchResult[]>(results); // 混合搜索结果
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const isRequestInProgressRef = useRef(false);
+
+  // 🔍 Debug: 追踪依赖项变化
+  useDebugDepsDeep('AIOverview', { query, results });
 
   // 实时提取已引用的来源编号
   useEffect(() => {
@@ -75,18 +80,26 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
   useEffect(() => {
     // 验证数据有效性
     if (!query || !query.trim() || results.length === 0) {
-      console.log('Skipping overview: invalid data', { query: !!query, resultsCount: results.length });
+      console.log('[AIOverview] Skipping overview: invalid data', { query: !!query, resultsCount: results.length });
+      return;
+    }
+
+    // 如果已有请求正在进行中，跳过（防止 React Strict Mode 的第二次 mount）
+    if (isRequestInProgressRef.current) {
+      console.log('[AIOverview] 🚫 Skipping: request already in progress (likely Strict Mode re-mount)');
       return;
     }
 
     // 取消之前的请求
     if (abortControllerRef.current) {
+      console.log('[AIOverview] Aborting previous request');
       abortControllerRef.current.abort();
     }
 
     const generateOverview = async () => {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
+      isRequestInProgressRef.current = true;
 
       setIsLoading(true);
       setError(null);
@@ -99,9 +112,10 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
           results: results
         };
 
-        console.log('Sending overview request:', { 
+        console.log('[AIOverview] 🚀 Sending overview request:', { 
           query: requestData.query, 
-          resultsCount: requestData.results.length 
+          resultsCount: requestData.results.length,
+          timestamp: new Date().toISOString()
         });
 
         const response = await fetch('/api/overview', {
@@ -116,9 +130,11 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Overview API error:', response.status, errorText);
+          console.error('[AIOverview] ❌ API error:', response.status, errorText);
           throw new Error(`Failed to generate overview: ${response.status}`);
         }
+
+        console.log('[AIOverview] ✅ Response received, starting stream...');
 
         // 从响应头获取混合搜索结果
         const searchResultsHeader = response.headers.get('X-Search-Results');
@@ -135,10 +151,10 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
             
             if (decodedResults && decodedResults.length > 0) {
               setEnhancedResults(decodedResults);
-              console.log('Loaded enhanced results from response header:', decodedResults.length);
+              console.log('[AIOverview] 📚 Loaded enhanced results from response header:', decodedResults.length);
             }
           } catch (decodeError) {
-            console.warn('Failed to decode search results from header:', decodeError);
+            console.warn('[AIOverview] ⚠️ Failed to decode search results from header:', decodeError);
           }
         }
 
@@ -161,7 +177,8 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
         }
 
         setIsLoading(false);
-        console.log('Overview generation completed');
+        isRequestInProgressRef.current = false;
+        console.log('[AIOverview] ✨ Overview generation completed');
         
         // 通知父组件AI回答已完成
         if (onAIResponseComplete && fullResponse) {
@@ -169,21 +186,27 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
-          console.log('Overview request aborted');
+          console.log('[AIOverview] 🛑 Overview request aborted');
+          isRequestInProgressRef.current = false;
           return;
         }
-        console.error('Overview generation error:', err);
+        console.error('[AIOverview] ❌ Overview generation error:', err);
         setError(err instanceof Error ? err : new Error('Unknown error'));
         setIsLoading(false);
+        isRequestInProgressRef.current = false;
       }
     };
 
+    console.log('[AIOverview] 🔄 useEffect triggered - calling generateOverview()');
     generateOverview();
 
     return () => {
       if (abortControllerRef.current) {
+        console.log('[AIOverview] 🧹 Cleanup: aborting request');
         abortControllerRef.current.abort();
       }
+      // 重置进行中标志，允许下次 mount 时重新请求（处理 Strict Mode）
+      isRequestInProgressRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, results]);
