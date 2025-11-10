@@ -15,7 +15,7 @@ export function useRRWebRecorder({
   enabled, 
   recordingId,
   uploadInterval = 30000, // 30 秒
-  debounceMs = 5000, // 5 秒防抖
+  debounceMs = 3000, // 3 秒防抖
 }: UseRRWebRecorderOptions) {
   const [isRecording, setIsRecording] = useState(false);
   const [eventsCount, setEventsCount] = useState(0);

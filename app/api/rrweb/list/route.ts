@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { list } from '@vercel/blob';
+import { list } from '@/lib/r2-storage';
 
 /**
  * 获取所有录制列表

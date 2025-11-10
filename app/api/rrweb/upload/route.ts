@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put } from '@vercel/blob';
+import { put, list } from '@/lib/r2-storage';
 import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 /**
@@ -82,8 +82,6 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const { list } = await import('@vercel/blob');
 
     // 如果指定了 sessionId，返回该 session 的数据
     if (sessionId) {
