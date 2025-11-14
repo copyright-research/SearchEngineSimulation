@@ -83,71 +83,118 @@ function HomeContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50">
-      {/* 背景装饰 */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-
-      <main className="container mx-auto px-4 relative">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--google-bg)' }}>
+      <main className={`px-4 relative ${hasSearched ? 'max-w-none' : 'container mx-auto'}`}>
         {/* Header */}
-        <header className={`transition-all duration-500 ${hasSearched ? 'pt-8 pb-6' : 'pt-32 pb-12'}`}>
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <h1 className={`font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 transition-all duration-500 ${hasSearched ? 'text-3xl' : 'text-6xl'}`}>
-                ReSearch
-              </h1>
-              {!hasSearched && (
+        <header className={`transition-all duration-300 ${hasSearched ? 'pt-4 pb-4' : 'pt-40 pb-8'}`}>
+          {hasSearched ? (
+            /* Google 搜索结果页面布局：Logo 和 SearchBar 在同一行 */
+            <div className="flex items-center gap-8 mb-4" style={{ maxWidth: '1140px' }}>
+              {/* Logo - 左侧 */}
+              <a href="/" className="flex-shrink-0">
+                <h1 className="text-2xl" style={{ 
+                  fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                  fontWeight: 400,
+                  color: 'var(--google-text)',
+                  cursor: 'pointer'
+                }}>
+                  <span style={{ color: '#4285f4' }}>R</span>
+                  <span style={{ color: '#ea4335' }}>e</span>
+                  <span style={{ color: '#fbbc04' }}>S</span>
+                  <span style={{ color: '#4285f4' }}>e</span>
+                  <span style={{ color: '#34a853' }}>a</span>
+                  <span style={{ color: '#ea4335' }}>r</span>
+                  <span style={{ color: '#4285f4' }}>c</span>
+                  <span style={{ color: '#fbbc04' }}>h</span>
+                </h1>
+              </a>
+              
+              {/* SearchBar - 右侧，占据剩余空间 */}
+              <div className="flex-1" style={{ maxWidth: '692px' }}>
+                <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+              </div>
+            </div>
+          ) : (
+            /* 首页布局：居中 */
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center gap-4 mb-3">
+                {/* Google-style logo */}
+                <h1 className="text-5xl" style={{ 
+                  fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                  fontWeight: 400,
+                  color: 'var(--google-text)'
+                }}>
+                  <span style={{ color: '#4285f4' }}>R</span>
+                  <span style={{ color: '#ea4335' }}>e</span>
+                  <span style={{ color: '#fbbc04' }}>S</span>
+                  <span style={{ color: '#4285f4' }}>e</span>
+                  <span style={{ color: '#34a853' }}>a</span>
+                  <span style={{ color: '#ea4335' }}>r</span>
+                  <span style={{ color: '#4285f4' }}>c</span>
+                  <span style={{ color: '#fbbc04' }}>h</span>
+                </h1>
                 <a
                   href="/ai"
-                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-105"
+                  className="px-4 py-2 text-sm font-medium rounded transition-colors"
+                  style={{
+                    backgroundColor: 'var(--google-blue)',
+                    color: '#ffffff',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--google-blue-dark)';
+                    e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--google-blue)';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
                 >
                   Try AI Mode
                 </a>
-              )}
+              </div>
+              
+              <SearchBar onSearch={handleSearch} isLoading={isLoading} />
             </div>
-            {!hasSearched && (
-              <p className="mt-4 text-gray-600 text-lg animate-fade-in">
-                Fast, accurate, and elegant search experience
-              </p>
-            )}
-          </div>
-          
-          <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+          )}
         </header>
 
-        {/* AI Overview */}
-        {showAIOverview && hasSearched && !isLoading && !error && results.length > 0 && (
-          <AIOverview 
-            query={currentQuery} 
-            results={results}
-            onAIResponseComplete={(aiResponse) => {
-              // 当AI回答完成时，保存带有AI回答的搜索历史
-              saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse).catch(err => {
-                console.error('Failed to save AI response:', err);
-              });
-            }}
-          />
-        )}
+        {/* 内容区域 - 与 SearchBar 左对齐 */}
+        <div style={{ marginLeft: hasSearched ? '182px' : '0' }}>
+          {/* AI Overview */}
+          {showAIOverview && hasSearched && !isLoading && !error && results.length > 0 && (
+            <AIOverview 
+              query={currentQuery} 
+              results={results}
+              onAIResponseComplete={(aiResponse) => {
+                // 当AI回答完成时，保存带有AI回答的搜索历史
+                saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse).catch(err => {
+                  console.error('Failed to save AI response:', err);
+                });
+              }}
+            />
+          )}
 
-        {/* Search Results */}
-        {hasSearched && (
-          <SearchResults
-            results={results}
-            searchTime={searchInfo.searchTime}
-            totalResults={searchInfo.totalResults}
-            isLoading={isLoading}
-            error={error || undefined}
-          />
-        )}
+          {/* Search Results */}
+          {hasSearched && (
+            <SearchResults
+              results={results}
+              searchTime={searchInfo.searchTime}
+              totalResults={searchInfo.totalResults}
+              isLoading={isLoading}
+              error={error || undefined}
+            />
+          )}
+        </div>
 
         {/* Footer */}
         {!hasSearched && (
-          <footer className="absolute bottom-8 left-0 right-0 text-center text-sm text-gray-500">
+          <footer className="absolute bottom-8 left-0 right-0 text-center text-sm" style={{ color: 'var(--google-text-secondary)' }}>
             <p>
-              Tip: Press <kbd className="px-2 py-1 bg-white/80 backdrop-blur-sm rounded border border-gray-300 shadow-sm text-xs font-mono">/</kbd> to focus search
+              Tip: Press <kbd className="px-2 py-1 rounded border text-xs font-mono" style={{
+                backgroundColor: 'var(--google-bg-secondary)',
+                borderColor: 'var(--google-border)',
+                color: 'var(--google-text)'
+              }}>/</kbd> to focus search
             </p>
           </footer>
         )}
@@ -162,8 +209,8 @@ function HomeContent() {
 export default function Home() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--google-bg)' }}>
+        <div style={{ color: 'var(--google-text-secondary)' }}>Loading...</div>
       </div>
     }>
       <HomeContent />

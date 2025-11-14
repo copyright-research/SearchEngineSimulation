@@ -21,14 +21,14 @@ export default function SearchResults({
 }: SearchResultsProps) {
   if (isLoading) {
     return (
-      <div className="w-full max-w-3xl mx-auto mt-8 space-y-6">
+      <div className="w-full mt-6 space-y-6" style={{ maxWidth: '652px' }}>
         {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-            <div className="h-3 bg-gray-200 rounded w-1/2 mb-3"></div>
+            <div className="h-4 rounded w-3/4 mb-2" style={{ backgroundColor: 'var(--google-bg-secondary)' }}></div>
+            <div className="h-3 rounded w-1/2 mb-3" style={{ backgroundColor: 'var(--google-bg-secondary)' }}></div>
             <div className="space-y-2">
-              <div className="h-3 bg-gray-200 rounded"></div>
-              <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+              <div className="h-3 rounded" style={{ backgroundColor: 'var(--google-bg-secondary)' }}></div>
+              <div className="h-3 rounded w-5/6" style={{ backgroundColor: 'var(--google-bg-secondary)' }}></div>
             </div>
           </div>
         ))}
@@ -38,16 +38,19 @@ export default function SearchResults({
 
   if (error) {
     return (
-      <div className="w-full max-w-3xl mx-auto mt-8">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+      <div className="w-full mt-6" style={{ maxWidth: '652px' }}>
+        <div className="border-l-4 p-4 rounded" style={{
+          backgroundColor: '#fce8e6',
+          borderColor: '#d93025'
+        }}>
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5" style={{ color: '#d93025' }} viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">
+              <p className="text-sm" style={{ color: '#5f6368' }}>
                 Search error: {error}
               </p>
             </div>
@@ -59,9 +62,10 @@ export default function SearchResults({
 
   if (results.length === 0) {
     return (
-      <div className="w-full max-w-3xl mx-auto mt-8 text-center py-12">
+      <div className="w-full mt-6 text-center py-12" style={{ maxWidth: '652px' }}>
         <svg
-          className="mx-auto h-12 w-12 text-gray-400"
+          className="mx-auto h-12 w-12"
+          style={{ color: 'var(--google-text-tertiary)' }}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -73,23 +77,22 @@ export default function SearchResults({
             d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <h3 className="mt-2 text-sm font-medium text-gray-900">No results found</h3>
-        <p className="mt-1 text-sm text-gray-500">Try different keywords</p>
+        <h3 className="mt-2 text-sm font-medium" style={{ color: 'var(--google-text)' }}>No results found</h3>
+        <p className="mt-1 text-sm" style={{ color: 'var(--google-text-secondary)' }}>Try different keywords</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto mt-8 mb-12">
+    <div className="w-full mt-6 mb-12" style={{ maxWidth: '652px' }}>
       {searchTime && totalResults && (
-        <div className="text-sm text-gray-500 mb-6 px-2">
-          About <span className="font-medium text-gray-700">{totalResults}</span> results
-          <span className="text-gray-400"> · </span>
-          {searchTime.toFixed(2)} seconds
+        <div className="text-sm mb-4 px-1" style={{ color: 'var(--google-text-secondary)' }}>
+          About <span style={{ color: 'var(--google-text)' }}>{totalResults}</span> results
+          <span style={{ color: 'var(--google-text-tertiary)' }}> ({searchTime.toFixed(2)} seconds)</span>
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-8">
         {results.map((result, index) => (
           <SearchResultItem key={index} result={result} index={index} />
         ))}
@@ -116,17 +119,20 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
 
   return (
     <article 
-      className="search-result-item group p-4 rounded-lg hover:bg-gray-50 transition-all duration-200 hover:shadow-md border border-transparent hover:border-gray-200"
+      className="search-result-item group"
       data-result-index={index + 1}
       style={{
-        animation: `fadeInUp 0.4s ease-out ${index * 0.05}s both`,
+        animation: `fadeInUp 0.3s ease-out ${index * 0.03}s both`,
+        paddingBottom: '20px',
+        borderBottom: '1px solid var(--google-border)',
+        marginBottom: '20px'
       }}
     >
       <div className="flex gap-4">
         {/* 左侧：内容 */}
         <div className="flex-1 min-w-0">
-          {/* 网站信息 */}
-          <div className="flex items-center gap-2 mb-2">
+          {/* 网站信息和 URL */}
+          <div className="flex items-center gap-2 mb-1">
             {faviconUrl && (
               <Image
                 src={faviconUrl}
@@ -137,11 +143,18 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
                 unoptimized
               />
             )}
-            {result.displayLink && (
-              <span className="text-sm font-medium text-gray-700">
-                {result.displayLink}
-              </span>
-            )}
+            <div className="flex flex-col">
+              {result.displayLink && (
+                <span className="text-sm" style={{ color: 'var(--google-text)' }}>
+                  {result.displayLink}
+                </span>
+              )}
+              {result.formattedUrl && (
+                <span className="text-xs truncate" style={{ color: 'var(--google-text-secondary)' }}>
+                  {result.formattedUrl}
+                </span>
+              )}
+            </div>
           </div>
           
           {/* 标题 */}
@@ -153,36 +166,44 @@ function SearchResultItem({ result, index }: { result: SearchResult; index: numb
             data-result-index={index + 1}
             data-result-title={result.title}
           >
-            <h2 className="text-xl text-blue-600 group-hover/link:text-blue-800 group-hover/link:underline font-normal mb-2 line-clamp-2 leading-snug">
+            <h2 
+              className="text-xl font-normal mb-1 line-clamp-2 leading-snug"
+              style={{ 
+                color: 'var(--google-link)',
+                fontFamily: 'Roboto, Arial, sans-serif'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
               {result.title}
             </h2>
           </a>
           
           {/* 摘要 */}
-          <p className="text-sm text-gray-600 line-clamp-3 mb-2 leading-relaxed">
+          <p 
+            className="text-sm line-clamp-2 leading-relaxed"
+            style={{ color: 'var(--google-text-secondary)' }}
+          >
             {result.snippet}
           </p>
-          
-          {/* URL */}
-          {result.formattedUrl && (
-            <div className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-              </svg>
-              <span className="truncate">{result.formattedUrl}</span>
-            </div>
-          )}
         </div>
 
         {/* 右侧：缩略图（如果有） */}
         {thumbnail && !imgError && (
-          <div className="flex-shrink-0 w-28 h-28 relative rounded-lg overflow-hidden bg-gray-100 group-hover:shadow-lg transition-shadow">
+          <div 
+            className="flex-shrink-0 w-24 h-24 relative rounded overflow-hidden"
+            style={{ backgroundColor: 'var(--google-bg-secondary)' }}
+          >
             <Image
               src={thumbnail.src}
               alt={result.title}
               fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-              sizes="112px"
+              className="object-cover"
+              sizes="96px"
               onError={() => setImgError(true)}
             />
           </div>

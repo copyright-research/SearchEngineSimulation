@@ -41,18 +41,19 @@ export default function SearchBar({ onSearch, isLoading, initialQuery = '' }: Se
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
+    <form onSubmit={handleSubmit} className="w-full">
       <div className="relative group">
         {/* 搜索图标 */}
         <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
           {isLoading ? (
-            <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24">
+            <svg className="animate-spin h-5 w-5" style={{ color: 'var(--google-blue)' }} viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           ) : (
             <svg
-              className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors"
+              className="w-5 h-5 transition-colors"
+              style={{ color: 'var(--google-text-tertiary)' }}
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -65,17 +66,39 @@ export default function SearchBar({ onSearch, isLoading, initialQuery = '' }: Se
           )}
         </div>
         
-        {/* 搜索输入框 */}
+        {/* 搜索输入框 - Google 风格 */}
         <input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search anything... (Press / to focus)"
-          className="w-full pl-12 pr-12 py-4 text-lg border-2 border-gray-200 rounded-full 
-                     focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 
-                     transition-all duration-200 shadow-sm hover:shadow-md
-                     disabled:bg-gray-50 disabled:cursor-not-allowed"
+          placeholder="Search anything..."
+          className="w-full pl-12 pr-12 py-3.5 text-base rounded-full transition-all duration-200 disabled:cursor-not-allowed"
+          style={{
+            border: '1px solid var(--google-border)',
+            backgroundColor: 'var(--google-bg)',
+            color: 'var(--google-text)',
+            fontFamily: 'Roboto, Arial, sans-serif',
+            fontSize: '16px',
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.boxShadow = '0 1px 6px rgba(32,33,36,.28)';
+            e.currentTarget.style.borderColor = 'transparent';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.borderColor = 'var(--google-border)';
+          }}
+          onMouseEnter={(e) => {
+            if (document.activeElement !== e.currentTarget) {
+              e.currentTarget.style.boxShadow = '0 1px 2px rgba(32,33,36,.28)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (document.activeElement !== e.currentTarget) {
+              e.currentTarget.style.boxShadow = 'none';
+            }
+          }}
           disabled={isLoading}
         />
 
@@ -84,7 +107,14 @@ export default function SearchBar({ onSearch, isLoading, initialQuery = '' }: Se
           <button
             type="button"
             onClick={handleClear}
-            className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute inset-y-0 right-4 flex items-center transition-colors"
+            style={{ color: 'var(--google-text-tertiary)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--google-text-secondary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--google-text-tertiary)';
+            }}
             aria-label="Clear search"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
