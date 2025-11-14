@@ -215,7 +215,14 @@ html {
     --m3c23: #1a73e8; /* AI icon color */
     --m3c9: #001d35; /* Primary text color for AI Overview */
     --m3c11: #0a0a0a; /* Content text color */
-    --IXoxUe: #5f6368; /* Secondary text color */
+    --IXoxUe: #56595e; /* Secondary text color */
+    
+    /* Google AI mode specific colors (from google-snippet-2025-11-14 (1)) */
+    --nvzc36: #f7f8fa; /* Sources card background */
+    --jINu6c: #0a0a0a; /* Primary text color */
+    --bbQxAb: #0a0a0a; /* Button/link text color */
+    --gS5jXb: #dcdfe5; /* Scrollbar color */
+    --TSWZIb: #e9ebf0; /* Favicon background */
   }
 
 .dark {

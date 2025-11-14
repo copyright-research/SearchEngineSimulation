@@ -183,59 +183,151 @@ export default function AIModePage() {
   // Sources 现在直接从 AI 响应的 data 字段中获取，不再需要单独关联
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-gray-50">
-      {/* 背景装饰 - 复用主页的 */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-
-      <div className="container mx-auto px-4 max-w-6xl">
-        {/* Header */}
-        <header className="pt-6 pb-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link 
-                href="/" 
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--google-bg)' }}>
+      <div className={`px-4 relative ${messages.length > 0 ? 'max-w-none' : 'container mx-auto'}`}>
+        {/* Header - Google 风格 */}
+        <header className={`transition-all duration-300 ${messages.length > 0 ? 'pt-4 pb-4' : 'pt-40 pb-8'}`}>
+          {messages.length > 0 ? (
+            /* 对话模式：Logo 和返回按钮在同一行 */
+            <div className="flex items-center gap-8 mb-4" style={{ maxWidth: '1140px' }}>
+              {/* Logo - 左侧 */}
+              <Link href="/" className="flex-shrink-0">
+                <h1 className="text-2xl" style={{ 
+                  fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                  fontWeight: 400,
+                  color: 'var(--google-text)',
+                  cursor: 'pointer'
+                }}>
+                  <span style={{ color: '#4285f4' }}>R</span>
+                  <span style={{ color: '#ea4335' }}>e</span>
+                  <span style={{ color: '#fbbc04' }}>S</span>
+                  <span style={{ color: '#4285f4' }}>e</span>
+                  <span style={{ color: '#34a853' }}>a</span>
+                  <span style={{ color: '#ea4335' }}>r</span>
+                  <span style={{ color: '#4285f4' }}>c</span>
+                  <span style={{ color: '#fbbc04' }}>h</span>
+                  <span style={{ color: 'var(--google-text)', marginLeft: '8px' }}>AI</span>
+                </h1>
               </Link>
-              <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
-                AI Mode
-              </h1>
+              
+              {/* 返回搜索按钮 */}
+              <Link 
+                href="/"
+                className="text-sm transition-colors"
+                style={{ 
+                  color: 'var(--google-blue)',
+                  fontFamily: 'Roboto, Arial, sans-serif'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.textDecoration = 'none';
+                }}
+              >
+                ← Back to Search
+              </Link>
             </div>
-            <Link 
-              href="/"
-              className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-            >
-              Switch to Search
-            </Link>
-          </div>
+          ) : (
+            /* 首页布局：居中 */
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center gap-4 mb-3">
+                <h1 className="text-5xl" style={{ 
+                  fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                  fontWeight: 400,
+                  color: 'var(--google-text)'
+                }}>
+                  <span style={{ color: '#4285f4' }}>R</span>
+                  <span style={{ color: '#ea4335' }}>e</span>
+                  <span style={{ color: '#fbbc04' }}>S</span>
+                  <span style={{ color: '#4285f4' }}>e</span>
+                  <span style={{ color: '#34a853' }}>a</span>
+                  <span style={{ color: '#ea4335' }}>r</span>
+                  <span style={{ color: '#4285f4' }}>c</span>
+                  <span style={{ color: '#fbbc04' }}>h</span>
+                  <span style={{ color: 'var(--google-text)', marginLeft: '8px' }}>AI</span>
+                </h1>
+              </div>
+              <p className="text-base mb-8" style={{ color: 'var(--google-text-secondary)' }}>
+                Ask me anything - I&apos;ll search the web and provide accurate, cited answers
+              </p>
+            </div>
+          )}
         </header>
 
         {/* Main Chat Area */}
-        <main className="py-6 pb-32 min-h-[calc(100vh-180px)] flex flex-col">
+        <main className="pb-32 min-h-[calc(100vh-180px)] flex flex-col">
           {messages.length === 0 ? (
-            // 欢迎界面
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg mb-6">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
-                Ask me anything
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 max-w-md mb-8">
-                I&apos;ll search the web and provide you with accurate, cited answers.
-              </p>
+            // 欢迎界面 - Google 风格
+            <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
+              {/* 输入框 - 首页居中显示 */}
+              <form onSubmit={handleFormSubmit} className="w-full max-w-2xl mb-8">
+                <div className="relative group">
+                  <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask a question..."
+                    disabled={status === 'streaming'}
+                    className="w-full px-6 py-4 pr-14 text-base transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      border: '1px solid var(--google-border)',
+                      backgroundColor: 'var(--google-bg)',
+                      color: 'var(--google-text)',
+                      fontFamily: 'Roboto, Arial, sans-serif',
+                      fontSize: '16px',
+                      borderRadius: '24px',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.boxShadow = '0 1px 6px rgba(32,33,36,.28)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                    onMouseEnter={(e) => {
+                      if (e.currentTarget !== document.activeElement) {
+                        e.currentTarget.style.boxShadow = '0 1px 6px rgba(32,33,36,.28)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (e.currentTarget !== document.activeElement) {
+                        e.currentTarget.style.boxShadow = 'none';
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={status === 'streaming' || !input.trim()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: status === 'streaming' || !input.trim() ? 'transparent' : 'var(--google-blue)',
+                      color: '#ffffff'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!(status === 'streaming' || !input.trim())) {
+                        e.currentTarget.style.backgroundColor = 'var(--google-blue-dark)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!(status === 'streaming' || !input.trim())) {
+                        e.currentTarget.style.backgroundColor = 'var(--google-blue)';
+                      }
+                    }}
+                  >
+                    {status === 'streaming' ? (
+                      <Loader size={20} className="text-blue-600" />
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </form>
               
-              {/* 示例问题 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl w-full">
+              {/* 示例问题 - Google 风格 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
                 {[
                   "What's new in Next.js 15?",
                   "How does React Server Components work?",
@@ -247,12 +339,26 @@ export default function AIModePage() {
                     onClick={() => {
                       setFilteredSourceNumbers(null);
                       setActiveMessageId(null);
-                      // Sources 会在 AI 响应中返回
                       sendMessage({
                         parts: [{ type: 'text', text: example }],
                       });
                     }}
-                    className="p-4 text-left text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
+                    className="p-4 text-left text-sm transition-all"
+                    style={{
+                      color: 'var(--google-text)',
+                      backgroundColor: 'var(--google-bg)',
+                      border: '1px solid var(--google-border)',
+                      borderRadius: '8px',
+                      fontFamily: 'Roboto, Arial, sans-serif'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = '0 1px 6px rgba(32,33,36,.28)';
+                      e.currentTarget.style.borderColor = 'var(--google-border-light)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = 'var(--google-border)';
+                    }}
                   >
                     {example}
                   </button>
@@ -260,10 +366,10 @@ export default function AIModePage() {
               </div>
             </div>
           ) : (
-            // 对话界面 - 使用 flex-grow 让内容从顶部开始，底部留白
-            <div className="max-w-6xl mx-auto w-full flex-grow flex flex-col">
+            // 对话界面 - Google 风格，左对齐
+            <div className="w-full flex-grow flex flex-col" style={{ marginLeft: '182px' }}>
               {/* 消息列表 */}
-              <div className="space-y-6 mb-6 flex-shrink-0 w-full">
+              <div className="space-y-8 mb-6 flex-shrink-0 w-full">
                 {messages.map((message, index) => {
                   // 提取文本内容
                   const textContent = message.parts
@@ -283,75 +389,135 @@ export default function AIModePage() {
                     <div 
                       key={message.id} 
                       className={isStreaming ? '' : 'animate-fade-in'}
-                      style={{ contain: 'layout style paint' }}
+                      style={{ 
+                        contain: 'layout style paint',
+                        paddingBottom: '20px',
+                        borderBottom: '1px solid var(--google-border)'
+                      }}
                     >
                       {message.role === 'user' ? (
-                        // 用户消息
-                        <div className="flex justify-end">
-                          <div className="max-w-[80%] px-4 py-3 bg-blue-500 text-white rounded-2xl rounded-tr-sm">
-                            <p className="text-sm">{textContent}</p>
+                        // 用户消息 - Google 风格
+                        <div className="mb-4">
+                          <div className="text-xl" style={{ 
+                            color: 'var(--google-text)',
+                            fontFamily: 'Roboto, Arial, sans-serif',
+                            fontWeight: 400
+                          }}>
+                            {textContent}
                           </div>
                         </div>
                       ) : (
-                        // AI 回答 - 复用 AIOverview 的样式
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                          {/* AI 回答内容 */}
-                          <div className="lg:col-span-2">
-                            <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-blue-950/20 dark:via-purple-950/20 dark:to-pink-950/20 rounded-2xl border border-blue-200 dark:border-blue-800 shadow-lg overflow-hidden">
-                              {/* Header */}
-                              <div className="flex items-center gap-3 p-4 border-b border-blue-200 dark:border-blue-800 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm">
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                  </svg>
-                                </div>
-                                <div>
-                                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Answer</h4>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400">Powered by Groq AI</p>
-                                </div>
-                              </div>
-                              
-                              {/* Content - 复用 Response 组件 */}
-                              <div className="p-6">
-                                <Response
-                                  onCitationClick={(numbers) => {
-                                    console.log('Citation clicked:', numbers, 'for message:', message.id);
-                                    console.log('Current message sources:', messageSources);
-                                    // 更新当前显示的 sources 为该消息的 sources
-                                    setActiveMessageId(message.id);
-                                    setFilteredSourceNumbers(numbers);
+                        // AI 回答 - Google AI Overview 风格
+                        <div className="flex flex-col lg:flex-row gap-5 items-start">
+                          {/* AI 回答内容 - 左侧 */}
+                          <div style={{ flex: '0 0 612px', maxWidth: '612px' }}>
+                            {/* Header */}
+                            <div 
+                              className="flex items-center gap-3 mb-4"
+                              style={{
+                                padding: '0',
+                                backgroundColor: 'transparent'
+                              }}
+                            >
+                              {/* AI 图标 - 使用 Google 的星形图标 */}
+                              <svg 
+                                className="fWWlmf" 
+                                height="24" 
+                                viewBox="0 0 24 24" 
+                                width="24" 
+                                focusable="false" 
+                                style={{ color: 'var(--m3c23)' }}
+                              >
+                                <path 
+                                  d="m12 2 2.582 6.953L22 11.618l-5.822 3.93L17.4 22 12 18.278 6.6 22l1.222-6.452L2 11.618l7.418-2.665L12 2z" 
+                                  fill="currentColor"
+                                />
+                              </svg>
+                              <div>
+                                <h4 
+                                  className="Fzsovc" 
+                                  style={{ 
+                                    fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                                    fontSize: '14px',
+                                    fontWeight: 500,
+                                    lineHeight: '20px',
+                                    color: 'var(--m3c9)'
                                   }}
                                 >
-                                  {textContent}
-                                </Response>
-                                
-                                {/* Loading 指示器 */}
-                                {status === 'streaming' && index === messages.length - 1 && (
-                                  <span className="inline-flex items-center ml-2">
-                                    <Loader size={14} className="text-blue-600 dark:text-blue-400" />
-                                  </span>
-                                )}
+                                  AI Overview
+                                </h4>
                               </div>
+                            </div>
+                            
+                            {/* Content - 复用 Response 组件 */}
+                            <div style={{ color: 'var(--google-text)' }}>
+                              <Response
+                                onCitationClick={(numbers) => {
+                                  console.log('Citation clicked:', numbers, 'for message:', message.id);
+                                  console.log('Current message sources:', messageSources);
+                                  setActiveMessageId(message.id);
+                                  setFilteredSourceNumbers(numbers);
+                                }}
+                              >
+                                {textContent}
+                              </Response>
+                              
+                              {/* Loading 指示器 */}
+                              {status === 'streaming' && index === messages.length - 1 && (
+                                <span className="inline-flex items-center ml-2 align-middle">
+                                  <Loader size={14} className="text-blue-600" />
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          {/* 该消息的 Sources */}
+                          {/* 该消息的 Sources - Google AI mode 风格 (.HWMcu) */}
                           {messageSources.length > 0 && (
-                            <div className="lg:col-span-1">
-                              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-lg overflow-hidden">
-                                <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                      </svg>
+                            <div 
+                              className="flex-shrink-0" 
+                              style={{ 
+                                width: '372px',
+                                maxHeight: '600px',
+                                position: 'sticky',
+                                top: '100px'
+                              }}
+                            >
+                              <div 
+                                className="flex flex-col overflow-hidden"
+                                style={{
+                                  background: 'var(--nvzc36, #f7f8fa)',
+                                  borderRadius: '20px',
+                                  boxShadow: 'none'
+                                }}
+                              >
+                                {/* Header (.S1iSq) */}
+                                <div style={{ padding: '16px 20px 8px' }}>
+                                  <div 
+                                    className="flex items-center justify-between"
+                                    style={{
+                                      alignItems: 'center',
+                                      flexDirection: 'row',
+                                      padding: '0',
+                                      justifyContent: 'space-between'
+                                    }}
+                                  >
+                                    <h4 
+                                      className="flex items-center gap-2"
+                                      style={{
+                                        fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                                        fontSize: '16px',
+                                        fontWeight: 500,
+                                        lineHeight: '24px',
+                                        color: 'var(--bbQxAb)'
+                                      }}
+                                    >
                                       Sources
                                       {(() => {
                                         const isClickFiltered = filteredSourceNumbers && filteredSourceNumbers.length > 0 && activeMessageId === message.id;
                                         
                                         if (isClickFiltered) {
                                           return (
-                                            <span className="text-[10px] text-blue-600 dark:text-blue-400">
+                                            <span className="text-xs" style={{ color: 'var(--google-blue)' }}>
                                               ({filteredSourceNumbers.join(', ')})
                                             </span>
                                           );
@@ -365,15 +531,38 @@ export default function AIModePage() {
                                           setFilteredSourceNumbers(null);
                                           setActiveMessageId(null);
                                         }}
-                                        className="text-[10px] text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
-                                        title="Show cited sources only"
+                                        className="text-xs transition-colors px-2 py-1 rounded"
+                                        style={{
+                                          color: 'var(--google-text-secondary)',
+                                          fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                                          backgroundColor: 'transparent',
+                                          fontSize: '12px'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'rgba(60,64,67,0.08)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'transparent';
+                                        }}
+                                        title="Clear filter"
                                       >
-                                        Reset
+                                        Clear filter
                                       </button>
                                     )}
                                   </div>
                                 </div>
-                                <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
+                                
+                                {/* Sources list (.bTFeG) */}
+                                <ul 
+                                  className="flex flex-col list-none overflow-y-auto relative"
+                                  style={{ 
+                                    maxHeight: 'calc(85vh - 220px)',
+                                    padding: '0',
+                                    marginBottom: '12px',
+                                    scrollbarColor: 'var(--gS5jXb) transparent',
+                                    gap: 0
+                                  }}
+                                >
                                   {(() => {
                                     // 从 AI 回答中提取所有被引用的数字
                                     const citedNumbersForDisplay = extractCitedNumbers(textContent);
@@ -416,46 +605,153 @@ export default function AIModePage() {
                                       const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
 
                                       return (
-                                        <a
+                                        <li 
                                           key={sourceNumber}
-                                          href={source.link}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          data-source-number={sourceNumber}
-                                          className="flex items-start gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all group"
+                                          className="relative"
+                                          style={{
+                                            backgroundColor: 'transparent',
+                                            borderRadius: 0
+                                          }}
                                         >
-                                          <span className="flex-shrink-0 w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center mt-0.5">
-                                            {sourceNumber}
-                                          </span>
-                                          <div className="flex-1 min-w-0 flex items-start gap-1.5">
-                                            <Image
-                                              src={faviconUrl}
-                                              alt=""
-                                              width={14}
-                                              height={14}
-                                              className="rounded flex-shrink-0 mt-0.5"
-                                              unoptimized
-                                              onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
+                                          {/* Separator (.WEy4sd) */}
+                                          {sourceIndex > 0 && (
+                                            <div 
+                                              style={{
+                                                borderTop: '1px solid #f0f2f5',
+                                                paddingBottom: '10px',
+                                                paddingTop: '10px'
                                               }}
                                             />
-                                            <div className="flex-1 min-w-0">
-                                              <p className="text-xs font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-400 line-clamp-2 leading-tight">
-                                                {source.title}
-                                              </p>
-                                              <p className="text-[10px] text-gray-600 dark:text-gray-400 truncate mt-0.5">
-                                                {source.displayLink}
-                                              </p>
-                                            </div>
+                                          )}
+                                          
+                                          {/* Source item (.MFrAxb .BKnikc) */}
+                                          <div 
+                                            className="relative overflow-hidden"
+                                            style={{
+                                              padding: sourceIndex === 0 ? '12px 20px' : '0 20px 12px 20px'
+                                            }}
+                                          >
+                                            <a
+                                              href={source.link}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              data-source-number={sourceNumber}
+                                              className="flex relative"
+                                              style={{
+                                                textDecoration: 'none',
+                                                zIndex: 0
+                                              }}
+                                            >
+                                              {/* Content (.T5ny9d) */}
+                                              <div 
+                                                className="flex flex-col flex-1 relative"
+                                                style={{
+                                                  minHeight: 0,
+                                                  overflow: 'hidden'
+                                                }}
+                                              >
+                                                {/* Title (.Nn35F) */}
+                                                <div 
+                                                  className="line-clamp-2"
+                                                  style={{
+                                                    fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                                                    color: 'var(--jINu6c)',
+                                                    fontSize: '14px',
+                                                    lineHeight: '1.4',
+                                                    margin: '0 0 4px',
+                                                    fontWeight: 500,
+                                                    textDecoration: 'none'
+                                                  }}
+                                                  onMouseEnter={(e) => {
+                                                    e.currentTarget.style.textDecoration = 'underline';
+                                                  }}
+                                                  onMouseLeave={(e) => {
+                                                    e.currentTarget.style.textDecoration = 'none';
+                                                  }}
+                                                >
+                                                  {source.title}
+                                                </div>
+                                                
+                                                {/* Snippet (.vhJ6Pe) */}
+                                                <span 
+                                                  className="line-clamp-2"
+                                                  style={{
+                                                    color: 'var(--IXoxUe)',
+                                                    margin: '0 0 8px',
+                                                    fontSize: '14px',
+                                                    lineHeight: '1.3',
+                                                    whiteSpace: 'normal',
+                                                    overflow: 'hidden'
+                                                  }}
+                                                >
+                                                  {source.snippet}
+                                                </span>
+                                                
+                                                {/* Domain info (.w8lk7d) */}
+                                                <div 
+                                                  className="flex items-center"
+                                                  style={{
+                                                    alignSelf: 'flex-end',
+                                                    marginRight: 'auto',
+                                                    marginTop: 'auto',
+                                                    width: '100%'
+                                                  }}
+                                                >
+                                                  <div className="flex items-center justify-center rounded-full" style={{ width: '16px', height: '16px' }}>
+                                                    <div 
+                                                      className="flex items-center justify-center rounded-full"
+                                                      style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        lineHeight: '100%',
+                                                        backgroundColor: 'var(--TSWZIb)',
+                                                        flexShrink: 0,
+                                                        overflow: 'hidden'
+                                                      }}
+                                                    >
+                                                      <Image
+                                                        src={faviconUrl}
+                                                        alt=""
+                                                        width={16}
+                                                        height={16}
+                                                        className="rounded"
+                                                        unoptimized
+                                                        onError={(e) => {
+                                                          e.currentTarget.style.display = 'none';
+                                                        }}
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                  <div 
+                                                    className="flex flex-col overflow-hidden text-ellipsis whitespace-nowrap"
+                                                    style={{
+                                                      color: 'var(--IXoxUe)',
+                                                      marginInlineStart: '8px'
+                                                    }}
+                                                  >
+                                                    <span 
+                                                      className="overflow-hidden text-ellipsis whitespace-nowrap"
+                                                      style={{
+                                                        maxWidth: '200px',
+                                                        color: 'var(--bbQxAb)',
+                                                        fontSize: '12px',
+                                                        fontWeight: 400,
+                                                        letterSpacing: '0.1px',
+                                                        lineHeight: '1.3'
+                                                      }}
+                                                    >
+                                                      {source.displayLink}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </a>
                                           </div>
-                                          <svg className="flex-shrink-0 w-3 h-3 text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                          </svg>
-                                        </a>
+                                        </li>
                                       );
                                     });
                                   })()}
-                                </div>
+                                </ul>
                               </div>
                             </div>
                           )}
@@ -475,37 +771,89 @@ export default function AIModePage() {
           )}
         </main>
 
-        {/* 输入框 - Fixed at bottom */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 z-10">
-          <div className="container mx-auto px-4 py-4 max-w-4xl">
-            <form onSubmit={handleFormSubmit} className="relative">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a question..."
-                disabled={status === 'streaming'}
-                className="w-full px-6 py-4 pr-14 text-sm bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                autoFocus
-              />
-              <button
-                type="submit"
-                disabled={status === 'streaming' || !input.trim()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        {/* 输入框 - Fixed at bottom - Google 风格 */}
+        {messages.length > 0 && (
+          <div 
+            className="fixed bottom-0 left-0 right-0 backdrop-blur-sm z-10"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              borderTop: '1px solid var(--google-border)'
+            }}
+          >
+            <div className="px-4 py-4" style={{ marginLeft: '182px', maxWidth: '912px' }}>
+              <form onSubmit={handleFormSubmit} className="relative">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask a follow-up question..."
+                  disabled={status === 'streaming'}
+                  className="w-full px-6 py-3 pr-14 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    border: '1px solid var(--google-border)',
+                    backgroundColor: 'var(--google-bg)',
+                    color: 'var(--google-text)',
+                    fontFamily: 'Roboto, Arial, sans-serif',
+                    fontSize: '14px',
+                    borderRadius: '24px',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.boxShadow = '0 1px 6px rgba(32,33,36,.28)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                  onMouseEnter={(e) => {
+                    if (e.currentTarget !== document.activeElement) {
+                      e.currentTarget.style.boxShadow = '0 1px 6px rgba(32,33,36,.28)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (e.currentTarget !== document.activeElement) {
+                      e.currentTarget.style.boxShadow = 'none';
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={status === 'streaming' || !input.trim()}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: status === 'streaming' || !input.trim() ? 'transparent' : 'var(--google-blue)',
+                    color: '#ffffff'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!(status === 'streaming' || !input.trim())) {
+                      e.currentTarget.style.backgroundColor = 'var(--google-blue-dark)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!(status === 'streaming' || !input.trim())) {
+                      e.currentTarget.style.backgroundColor = 'var(--google-blue)';
+                    }
+                  }}
+                >
+                  {status === 'streaming' ? (
+                    <Loader size={18} className="text-blue-600" />
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  )}
+                </button>
+              </form>
+              <p 
+                className="text-xs text-center mt-2"
+                style={{
+                  color: 'var(--google-text-secondary)',
+                  fontFamily: 'Roboto, Arial, sans-serif'
+                }}
               >
-                {status === 'streaming' ? (
-                  <Loader size={20} className="text-white" />
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                )}
-              </button>
-            </form>
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
-              AI responses may include mistakes. Please verify important information.
-            </p>
+                AI responses may include mistakes. Please verify important information.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* rrweb 录制器 */}
