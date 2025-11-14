@@ -23,9 +23,12 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
   const [citedSourceNumbers, setCitedSourceNumbers] = useState<Set<number>>(new Set());
   const [sourcesMaxHeight, setSourcesMaxHeight] = useState<string>('600px');
   const [enhancedResults, setEnhancedResults] = useState<SearchResult[]>(results); // 混合搜索结果
+  const [isContentExpanded, setIsContentExpanded] = useState(false);
+  const [shouldShowExpandButton, setShouldShowExpandButton] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isRequestInProgressRef = useRef(false);
+  const COLLAPSED_HEIGHT = 300; // 折叠时的最大高度（像素）
 
   // 🔍 Debug: 追踪依赖项变化
   useDebugDepsDeep('AIOverview', { query, results });
@@ -54,14 +57,22 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
     setCitedSourceNumbers(cited);
   }, [completion]);
 
-  // 动态计算 Sources 的最大高度
+  // 动态计算 Sources 的最大高度和检查是否需要展开按钮
   useEffect(() => {
     const updateSourcesHeight = () => {
       if (contentRef.current) {
-        const contentHeight = contentRef.current.offsetHeight;
+        const contentHeight = contentRef.current.scrollHeight;
         // Sources 高度不超过内容高度，最小 200px，最大 800px
         const maxHeight = Math.min(Math.max(contentHeight, 200), 800);
         setSourcesMaxHeight(`${maxHeight}px`);
+        
+        // 检查内容是否超过折叠高度
+        if (contentHeight > COLLAPSED_HEIGHT) {
+          setShouldShowExpandButton(true);
+        } else {
+          setShouldShowExpandButton(false);
+          setIsContentExpanded(false);
+        }
       }
     };
 
@@ -75,7 +86,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
     }
 
     return () => observer.disconnect();
-  }, [completion, isLoading]);
+  }, [completion, isLoading, COLLAPSED_HEIGHT]);
 
   useEffect(() => {
     // 验证数据有效性
@@ -315,35 +326,87 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 items-start">
               {/* 左侧：AI 生成的内容 (2/3 宽度) */}
-              <div ref={contentRef} className="lg:col-span-2">
-                <Response 
-                  onCitationClick={(numbers) => {
-                    // 自动展开 Sources 并筛选显示
-                    setShowSources(true);
-                    setFilteredSourceNumbers(numbers);
-                    
-                    // 滚动到第一个来源
-                    setTimeout(() => {
-                      if (numbers.length > 0) {
-                        const firstSource = document.querySelector(`[data-source-number="${numbers[0]}"]`);
-                        firstSource?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                      }
-                    }, 100);
+              <div className="lg:col-span-2 relative">
+                <div 
+                  className={`overflow-hidden transition-all duration-500 ease-in-out ${
+                    !isContentExpanded && shouldShowExpandButton ? 'relative' : ''
+                  }`}
+                  style={{
+                    maxHeight: !isContentExpanded && shouldShowExpandButton ? `${COLLAPSED_HEIGHT}px` : 'none'
                   }}
                 >
-                  {completion}
-                </Response>
-                {isLoading && (
-                  <span className="inline-flex items-center ml-2 align-middle">
-                    <Loader size={14} className="text-blue-600 dark:text-blue-400" />
-                  </span>
-                )}
+                  <div ref={contentRef}>
+                    <Response 
+                      onCitationClick={(numbers) => {
+                        // 自动展开 Sources 并筛选显示
+                        setShowSources(true);
+                        setFilteredSourceNumbers(numbers);
+                        
+                        // 滚动到第一个来源
+                        setTimeout(() => {
+                          if (numbers.length > 0) {
+                            const firstSource = document.querySelector(`[data-source-number="${numbers[0]}"]`);
+                            firstSource?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                          }
+                        }, 100);
+                      }}
+                    >
+                      {completion}
+                    </Response>
+                    {isLoading && (
+                      <span className="inline-flex items-center ml-2 align-middle">
+                        <Loader size={14} className="text-blue-600 dark:text-blue-400" />
+                      </span>
+                    )}
 
-                {/* Add disclaimer if not already in completion */}
-                {!isLoading && !completion.includes('AI responses may include mistakes') && (
-                  <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 italic">
-                    AI responses may include mistakes.
-                  </p>
+                    {/* Add disclaimer if not already in completion */}
+                    {!isLoading && !completion.includes('AI responses may include mistakes') && (
+                      <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 italic">
+                        AI responses may include mistakes.
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* 渐变遮罩 */}
+                  {!isContentExpanded && shouldShowExpandButton && (
+                    <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-blue-50 via-blue-50/80 to-transparent dark:from-blue-950/20 dark:via-blue-950/10 pointer-events-none" />
+                  )}
+                </div>
+                
+                {/* Show More / Show Less 按钮 */}
+                {shouldShowExpandButton && !isLoading && (
+                  <div className="flex justify-center mt-4">
+                    <button
+                      onClick={() => setIsContentExpanded(!isContentExpanded)}
+                      className="px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-all duration-200 flex items-center gap-2 group"
+                    >
+                      {isContentExpanded ? (
+                        <>
+                          <span>Show less</span>
+                          <svg 
+                            className="w-4 h-4 transition-transform group-hover:-translate-y-0.5" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </>
+                      ) : (
+                        <>
+                          <span>Show more</span>
+                          <svg 
+                            className="w-4 h-4 transition-transform group-hover:translate-y-0.5" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 )}
               </div>
 
