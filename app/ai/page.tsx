@@ -113,29 +113,49 @@ export default function AIModePage() {
           }));
         }
         
-        // 获取对应的用户查询
-        const userMessageIndex = messages.findIndex(m => m.id === message.id) - 1;
-        if (userMessageIndex >= 0) {
-          const userMessage = messages[userMessageIndex];
-          const userQuery = userMessage.parts
-            .filter((part) => part.type === 'text')
-            .map((part) => ('text' in part ? part.text : ''))
-            .join('');
-          
-          if (userQuery) {
-            saveSearchHistory(userQuery, 'ai' as const, sources, textContent)
-              .then(id => {
-                if (id) {
-                  setMessageHistoryIdMap(prev => ({
-                    ...prev,
-                    [message.id]: id
-                  }));
-                }
-              })
-              .catch(err => {
-                console.error('Failed to save AI chat history:', err);
-              });
+        // 获取对应的用户查询 - 优先从 Response Header 获取，因为 messages 状态在闭包中可能是旧的
+        let userQuery = '';
+        if (latestResponseHeadersRef.current) {
+          const originalQueryHeader = latestResponseHeadersRef.current.get('X-Original-Query');
+          if (originalQueryHeader) {
+            try {
+              const binaryString = atob(originalQueryHeader);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              userQuery = new TextDecoder('utf-8').decode(bytes);
+            } catch (e) {
+              console.error('Failed to decode user query from header:', e);
+            }
           }
+        }
+
+        // Fallback: 尝试从 messages 中获取 (如果 header 获取失败)
+        if (!userQuery) {
+          const userMessageIndex = messages.findIndex(m => m.id === message.id) - 1;
+          if (userMessageIndex >= 0) {
+            const userMessage = messages[userMessageIndex];
+            userQuery = userMessage.parts
+              .filter((part) => part.type === 'text')
+              .map((part) => ('text' in part ? part.text : ''))
+              .join('');
+          }
+        }
+          
+        if (userQuery) {
+          saveSearchHistory(userQuery, 'ai' as const, sources, textContent)
+            .then(id => {
+              if (id) {
+                setMessageHistoryIdMap(prev => ({
+                  ...prev,
+                  [message.id]: id
+                }));
+              }
+            })
+            .catch(err => {
+              console.error('Failed to save AI chat history:', err);
+            });
         }
       }
     },
