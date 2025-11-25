@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
@@ -32,6 +32,13 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
 
   // 🔍 Debug: 追踪依赖项变化
   useDebugDepsDeep('AIOverview', { query, results });
+
+  // 生成 results 的指纹，用于依赖项比较
+  // 这样可以避免因为 results 引用变化（即使内容没变）导致的 useEffect 重复执行
+  const resultsFingerprint = useMemo(() => {
+    if (!results || results.length === 0) return '';
+    return results.map(r => r.link).join('|');
+  }, [results]);
 
   // 实时提取已引用的来源编号
   useEffect(() => {
@@ -220,7 +227,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
       isRequestInProgressRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, results]);
+  }, [query, resultsFingerprint]);
 
   if (error || (!isLoading && !completion)) {
     return null;
