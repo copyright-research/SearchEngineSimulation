@@ -137,9 +137,11 @@ export async function GET(request: NextRequest) {
       });
 
       if (mergedList.blobs.length > 0) {
+        // 返回代理 URL 而不是直接的 R2 URL
+        const proxyUrl = `/api/rrweb/download?path=${encodeURIComponent(mergedList.blobs[0].pathname)}`;
         return NextResponse.json({
           type: 'merged',
-          url: mergedList.blobs[0].url,
+          url: proxyUrl,
           sessionId,
         });
       }
@@ -157,7 +159,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // 按 chunkIndex 排序
+      // 按 chunkIndex 排序，返回代理 URL
       const sortedChunks = chunksList.blobs
         .sort((a, b) => {
           const matchA = a.pathname.match(/chunk-(\d+)\.json$/);
@@ -166,7 +168,7 @@ export async function GET(request: NextRequest) {
           const indexB = parseInt(matchB?.[1] || '0');
           return indexA - indexB;
         })
-        .map(blob => blob.url);
+        .map(blob => `/api/rrweb/download?path=${encodeURIComponent(blob.pathname)}`);
 
       return NextResponse.json({
         type: 'chunks',

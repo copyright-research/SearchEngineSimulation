@@ -20,6 +20,7 @@ function HomeContent() {
   }>({});
   const [hasSearched, setHasSearched] = useState(false);
   const [currentQuery, setCurrentQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   
   // 从 URL 参数读取是否显示 AI Overview，默认显示
   const [showAIOverview, setShowAIOverview] = useState(true);
@@ -44,14 +45,18 @@ function HomeContent() {
     }
   }, [searchParams]);
 
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, page: number = 1) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
     setCurrentQuery(query);
+    setCurrentPage(page);
 
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      // Google API 使用 start 参数分页，每页 10 条结果
+      const start = (page - 1) * 10 + 1;
+      const url = `/api/search?q=${encodeURIComponent(query)}${start > 1 ? `&start=${start}` : ''}`;
+      const response = await fetch(url);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -67,8 +72,8 @@ function HomeContent() {
         totalResults: data.searchInformation?.formattedTotalResults,
       });
 
-      // 保存搜索历史（异步，不阻塞UI）
-      if (searchResults.length > 0) {
+      // 保存搜索历史（异步，不阻塞UI）- 只在第一页保存
+      if (searchResults.length > 0 && page === 1) {
         const mode = showAIOverview ? 'search_with_overview' : 'search';
         saveSearchHistory(query, mode, searchResults).catch(err => {
           console.error('Failed to save search history:', err);
@@ -79,6 +84,14 @@ function HomeContent() {
       setResults([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    if (currentQuery) {
+      handleSearch(currentQuery, page);
+      // 滚动到顶部
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -160,8 +173,8 @@ function HomeContent() {
 
         {/* 内容区域 - 与 SearchBar 左对齐 */}
         <div style={{ marginLeft: hasSearched ? '182px' : '0' }}>
-          {/* AI Overview */}
-          {showAIOverview && hasSearched && !isLoading && !error && results.length > 0 && (
+          {/* AI Overview - 只在第一页显示 */}
+          {showAIOverview && currentPage === 1 && hasSearched && !isLoading && !error && results.length > 0 && (
             <AIOverview 
               query={currentQuery} 
               results={results}
@@ -182,6 +195,8 @@ function HomeContent() {
               totalResults={searchInfo.totalResults}
               isLoading={isLoading}
               error={error || undefined}
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
             />
           )}
         </div>
