@@ -175,7 +175,7 @@ function HomeContent() {
         </header>
 
         {/* 内容区域 - 与 SearchBar 左对齐 */}
-        <div style={{ marginLeft: hasSearched ? '182px' : '0' }}>
+        <div className={`transition-[margin] duration-200 ${hasSearched ? 'xl:ml-[182px]' : ''}`}>
           {/* AI Overview - 只在第一页显示 */}
           {showAIOverview && currentPage === 1 && hasSearched && !isLoading && !error && results.length > 0 && (
             <AIOverview 

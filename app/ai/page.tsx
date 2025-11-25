@@ -396,7 +396,7 @@ export default function AIModePage() {
             </div>
           ) : (
             // 对话界面 - Google 风格，左对齐
-            <div className="w-full flex-grow flex flex-col" style={{ marginLeft: '182px' }}>
+            <div className="w-full flex-grow flex flex-col xl:ml-[182px]">
               {/* 消息列表 */}
               <div className="space-y-8 mb-6 flex-shrink-0 w-full">
                 {messages.map((message, index) => {
@@ -901,7 +901,7 @@ export default function AIModePage() {
               borderTop: '1px solid var(--google-border)'
             }}
           >
-            <div className="px-4 py-4" style={{ marginLeft: '182px', maxWidth: '1140px' }}>
+            <div className="px-4 py-4 xl:ml-[182px]" style={{ maxWidth: '1140px' }}>
               <form onSubmit={handleFormSubmit} className="relative">
                 <input
                   value={input}
