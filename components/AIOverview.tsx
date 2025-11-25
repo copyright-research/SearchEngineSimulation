@@ -6,14 +6,16 @@ import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
 import type { SearchResult } from '@/types/search';
 import { useDebugDepsDeep } from '@/lib/use-debug-deps';
+import { useSearchHistory } from '@/lib/use-search-history';
 
 interface AIOverviewProps {
   query: string;
   results: SearchResult[];
   onAIResponseComplete?: (response: string) => void;
+  historyId?: number | null;
 }
 
-export default function AIOverview({ query, results, onAIResponseComplete }: AIOverviewProps) {
+export default function AIOverview({ query, results, onAIResponseComplete, historyId }: AIOverviewProps) {
   const [completion, setCompletion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -26,10 +28,14 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
   const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [shouldShowExpandButton, setShouldShowExpandButton] = useState(false);
   const [isSourcesExpanded, setIsSourcesExpanded] = useState(false); // Sources 展开状态
+  const [userFeedback, setUserFeedback] = useState<'up' | 'down' | null>(null);
+  
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isRequestInProgressRef = useRef(false);
   const COLLAPSED_HEIGHT = 300; // 折叠时的最大高度（像素）
+
+  const { reportFeedback } = useSearchHistory();
 
   // 🔍 Debug: 追踪依赖项变化
   useDebugDepsDeep('AIOverview', { query, results });
@@ -123,6 +129,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
       setIsLoading(true);
       setError(null);
       setCompletion('');
+      setUserFeedback(null); // Reset feedback on new generation
 
       try {
         // 准备请求数据
@@ -229,6 +236,16 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, resultsFingerprint]);
+
+  const handleFeedback = async (feedback: 'up' | 'down') => {
+    if (!historyId) return;
+    
+    // Toggle feedback if clicking same button
+    const newFeedback = userFeedback === feedback ? null : feedback;
+    setUserFeedback(newFeedback);
+    
+    await reportFeedback(historyId, newFeedback);
+  };
 
   if (error || (!isLoading && !completion)) {
     return null;
@@ -432,18 +449,22 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
                           </div>
                           <div className="flex items-center gap-1">
                             <button 
-                              className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                              className={`p-2 rounded-full transition-colors ${userFeedback === 'up' ? 'text-blue-600 bg-blue-50' : 'text-[#70757a] hover:bg-[#f1f3f4]'}`}
                               aria-label="Good response"
+                              onClick={() => handleFeedback('up')}
+                              title="Good response"
                             >
-                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill={userFeedback === 'up' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                                 <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
                             <button 
-                              className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                              className={`p-2 rounded-full transition-colors ${userFeedback === 'down' ? 'text-blue-600 bg-blue-50' : 'text-[#70757a] hover:bg-[#f1f3f4]'}`}
                               aria-label="Bad response"
+                              onClick={() => handleFeedback('down')}
+                              title="Bad response"
                             >
-                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill={userFeedback === 'down' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                                 <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>

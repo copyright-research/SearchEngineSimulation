@@ -108,6 +108,7 @@ model SearchHistory {
   mode        String   // 'search' | 'search_with_overview' | 'ai'
   results     Json     // 存储搜索结果数组
   aiResponse  String?  @map("ai_response") @db.Text
+  feedback    String?  // 'up' | 'down'
   createdAt   DateTime @default(now()) @map("created_at")
   
   session     SearchSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)

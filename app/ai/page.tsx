@@ -14,6 +14,11 @@ import { useSearchHistory } from '@/lib/use-search-history';
 export default function AIModePage() {
   // 为每条消息存储对应的 sources（使用消息 ID 作为 key）
   const [messageSourcesMap, setMessageSourcesMap] = useState<Record<string, SearchResult[]>>({});
+  // 为每条消息存储对应的 historyId（使用消息 ID 作为 key）
+  const [messageHistoryIdMap, setMessageHistoryIdMap] = useState<Record<string, number>>({});
+  // 为每条消息存储反馈状态（使用消息 ID 作为 key）
+  const [messageFeedbackMap, setMessageFeedbackMap] = useState<Record<string, 'up' | 'down' | null>>({});
+  
   const [filteredSourceNumbers, setFilteredSourceNumbers] = useState<number[] | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null); // 追踪哪个消息的引用被点击了
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -21,8 +26,8 @@ export default function AIModePage() {
   // 存储最新的响应头（用于获取 sources）
   const latestResponseHeadersRef = useRef<Headers | null>(null);
   
-  // 搜索历史保存
-  const { saveSearchHistory } = useSearchHistory();
+  // 搜索历史保存和反馈
+  const { saveSearchHistory, reportFeedback } = useSearchHistory();
 
   // 从文本中提取所有被引用的数字
   const extractCitedNumbers = (text: string): number[] => {
@@ -102,9 +107,18 @@ export default function AIModePage() {
             .join('');
           
           if (userQuery && sources.length > 0) {
-            saveSearchHistory(userQuery, 'ai' as const, sources, textContent).catch(err => {
-              console.error('Failed to save AI chat history:', err);
-            });
+            saveSearchHistory(userQuery, 'ai' as const, sources, textContent)
+              .then(id => {
+                if (id) {
+                  setMessageHistoryIdMap(prev => ({
+                    ...prev,
+                    [message.id]: id
+                  }));
+                }
+              })
+              .catch(err => {
+                console.error('Failed to save AI chat history:', err);
+              });
           }
         }
       }
@@ -133,6 +147,21 @@ export default function AIModePage() {
     });
     
     setInput(''); // 清空输入框
+  };
+
+  const handleFeedback = async (messageId: string, feedback: 'up' | 'down') => {
+    const historyId = messageHistoryIdMap[messageId];
+    if (!historyId) return;
+
+    const currentFeedback = messageFeedbackMap[messageId];
+    const newFeedback = currentFeedback === feedback ? null : feedback;
+
+    setMessageFeedbackMap(prev => ({
+      ...prev,
+      [messageId]: newFeedback
+    }));
+
+    await reportFeedback(historyId, newFeedback);
   };
 
 
@@ -485,18 +514,22 @@ export default function AIModePage() {
                                   </div>
                                   <div className="flex items-center gap-1">
                                     <button 
-                                      className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                                      className={`p-2 rounded-full transition-colors ${messageFeedbackMap[message.id] === 'up' ? 'text-blue-600 bg-blue-50' : 'text-[#70757a] hover:bg-[#f1f3f4]'}`}
                                       aria-label="Good response"
+                                      onClick={() => handleFeedback(message.id, 'up')}
+                                      title="Good response"
                                     >
-                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill={messageFeedbackMap[message.id] === 'up' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                                         <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round"/>
                                       </svg>
                                     </button>
                                     <button 
-                                      className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                                      className={`p-2 rounded-full transition-colors ${messageFeedbackMap[message.id] === 'down' ? 'text-blue-600 bg-blue-50' : 'text-[#70757a] hover:bg-[#f1f3f4]'}`}
                                       aria-label="Bad response"
+                                      onClick={() => handleFeedback(message.id, 'down')}
+                                      title="Bad response"
                                     >
-                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill={messageFeedbackMap[message.id] === 'down' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
                                         <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" strokeLinecap="round" strokeLinejoin="round"/>
                                       </svg>
                                     </button>
@@ -652,10 +685,10 @@ export default function AIModePage() {
                                   }}
                                 >
                                   {(() => {
-                                    // Extract all cited numbers from the AI answer (main content only)
-                                    const citedNumbersForDisplay = extractCitedNumbers(mainContent);
+                                    // 从 AI 回答中提取所有被引用的数字
+                                    const citedNumbersForDisplay = extractCitedNumbers(textContent);
                                     
-                                    // Determine sources to display
+                                    // 确定要显示的 sources
                                     let displaySources: SearchResult[];
                                     let sourceNumbers: number[];
                                     
@@ -868,7 +901,7 @@ export default function AIModePage() {
               borderTop: '1px solid var(--google-border)'
             }}
           >
-            <div className="px-4 py-4" style={{ marginLeft: '182px', maxWidth: '1100px' }}>
+            <div className="px-4 py-4" style={{ marginLeft: '182px', maxWidth: '1140px' }}>
               <form onSubmit={handleFormSubmit} className="relative">
                 <input
                   value={input}
@@ -949,4 +982,3 @@ export default function AIModePage() {
     </div>
   );
 }
-

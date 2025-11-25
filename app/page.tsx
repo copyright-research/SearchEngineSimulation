@@ -24,6 +24,7 @@ function HomeContent() {
   
   // 从 URL 参数读取是否显示 AI Overview，默认显示
   const [showAIOverview, setShowAIOverview] = useState(true);
+  const [aiHistoryId, setAiHistoryId] = useState<number | null>(null);
   
   // 搜索历史保存
   const { saveSearchHistory } = useSearchHistory();
@@ -51,6 +52,7 @@ function HomeContent() {
     setHasSearched(true);
     setCurrentQuery(query);
     setCurrentPage(page);
+    setAiHistoryId(null); // Reset history ID on new search
 
     try {
       // Google API 使用 start 参数分页，每页 10 条结果
@@ -178,11 +180,16 @@ function HomeContent() {
             <AIOverview 
               query={currentQuery} 
               results={results}
+              historyId={aiHistoryId}
               onAIResponseComplete={(aiResponse) => {
                 // 当AI回答完成时，保存带有AI回答的搜索历史
-                saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse).catch(err => {
-                  console.error('Failed to save AI response:', err);
-                });
+                saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse)
+                  .then(id => {
+                    if (id) setAiHistoryId(id);
+                  })
+                  .catch(err => {
+                    console.error('Failed to save AI response:', err);
+                  });
               }}
             />
           )}

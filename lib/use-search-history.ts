@@ -17,7 +17,7 @@ export function useSearchHistory() {
       const rid = getUrlParamCaseInsensitive('rid');
       if (!rid) {
         console.log('No RID found, skipping search history save');
-        return;
+        return null;
       }
 
       // 保存搜索历史
@@ -47,16 +47,45 @@ export function useSearchHistory() {
           };
         }
         console.error('Failed to save search history:', errorDetails);
-        return;
+        return null;
       }
 
       const data = await response.json();
       console.log('Search history saved:', data);
+      return data.searchHistoryId as number;
     } catch (error) {
       console.error('Failed to save search history:', error);
+      return null;
     }
   }, []);
 
-  return { saveSearchHistory };
-}
+  const reportFeedback = useCallback(async (
+    historyId: number,
+    feedback: 'up' | 'down' | null
+  ) => {
+    try {
+      const response = await fetch('/api/history/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          historyId,
+          feedback,
+        }),
+      });
 
+      if (!response.ok) {
+        console.error('Failed to save feedback');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to save feedback:', error);
+      return false;
+    }
+  }, []);
+
+  return { saveSearchHistory, reportFeedback };
+}

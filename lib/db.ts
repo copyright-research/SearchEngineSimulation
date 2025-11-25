@@ -187,3 +187,16 @@ export async function getUserAnswerStats(rid: string) {
     accuracy: total > 0 ? (correct / total) * 100 : 0,
   };
 }
+
+/**
+ * 更新搜索历史的反馈 (up/down)
+ */
+export async function updateSearchHistoryFeedback(
+  historyId: number,
+  feedback: 'up' | 'down' | null
+) {
+  return await prisma.searchHistory.update({
+    where: { id: historyId },
+    data: { feedback },
+  });
+}
