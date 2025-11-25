@@ -29,6 +29,22 @@ export default function AIModePage() {
   // 搜索历史保存和反馈
   const { saveSearchHistory, reportFeedback } = useSearchHistory();
 
+  // 确保 URL 中有 RID
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasRid = Array.from(searchParams.keys()).some(key => key.toLowerCase() === 'rid');
+    
+    if (!hasRid) {
+      const newRid = 'auto-' + Math.random().toString(36).substring(2, 9);
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('RID', newRid);
+      window.history.replaceState({}, '', newUrl.toString());
+      console.log('[AI Page] Generated new RID:', newRid);
+    }
+  }, []);
+
   // 从文本中提取所有被引用的数字
   const extractCitedNumbers = (text: string): number[] => {
     const citationRegex = /\[(\d+(?:,\s*\d+)*)\]/g;
@@ -151,7 +167,10 @@ export default function AIModePage() {
 
   const handleFeedback = async (messageId: string, feedback: 'up' | 'down') => {
     const historyId = messageHistoryIdMap[messageId];
-    if (!historyId) return;
+    if (!historyId) {
+      console.warn('[AI Page] No historyId found for message feedback:', messageId);
+      return;
+    }
 
     const currentFeedback = messageFeedbackMap[messageId];
     const newFeedback = currentFeedback === feedback ? null : feedback;
