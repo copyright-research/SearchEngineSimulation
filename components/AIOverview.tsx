@@ -25,6 +25,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
   const [enhancedResults, setEnhancedResults] = useState<SearchResult[]>(results); // 混合搜索结果
   const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [shouldShowExpandButton, setShouldShowExpandButton] = useState(false);
+  const [isSourcesExpanded, setIsSourcesExpanded] = useState(false); // Sources 展开状态
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isRequestInProgressRef = useRef(false);
@@ -234,7 +235,7 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
   }
 
   return (
-    <div className="w-full mb-6 animate-fade-in" style={{ maxWidth: '912px' }}>
+    <div className="w-full mb-6 animate-fade-in" style={{ maxWidth: '1100px' }}>
       <div 
         className="overflow-visible transition-all duration-200"
         style={{
@@ -422,54 +423,69 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
                         </span>
                       )}
 
-                      {/* Add disclaimer if not already in completion */}
-                      {!isLoading && !completion.includes('AI responses may include mistakes') && (
-                        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 italic">
-                          AI responses may include mistakes.
-                        </p>
+                      {/* Footer with Disclaimer and Feedback Buttons */}
+                      {!isLoading && completion && (
+                        <div className="flex items-center justify-between mt-6 pt-2">
+                          <div className="text-[11px] text-[#70757a] font-roboto">
+                            <span>AI responses may include mistakes. </span>
+                            <a href="#" className="underline hover:text-[#4d5156]">Learn more</a>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                              aria-label="Good response"
+                            >
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                            <button 
+                              className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                              aria-label="Bad response"
+                            >
+                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
 
               {/* 右侧：Sources - Content 宽度的 1/3 */}
               {showSources && !isLoading && results.length > 0 && (
-                <div className="lg:sticky lg:top-4 lg:self-start flex-shrink-0" style={{ width: '100%', maxWidth: '217px', maxHeight: !isContentExpanded && shouldShowExpandButton ? `${COLLAPSED_HEIGHT}px` : '600px' }}>
-                  <div className="flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                      <h4 
-                        className="text-sm font-medium flex items-center gap-2"
-                        style={{ 
-                          color: 'var(--google-text)',
-                          fontFamily: "'Google Sans', Roboto, Arial, sans-serif"
-                        }}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                        Sources
-                        {filteredSourceNumbers && (
-                          <span className="text-xs font-normal" style={{ color: 'var(--google-blue)' }}>
-                            (Filtered)
-                          </span>
-                        )}
-                      </h4>
-                      <span className="text-xs" style={{ color: 'var(--google-text-secondary)' }}>
-                        {filteredSourceNumbers 
-                          ? filteredSourceNumbers.length 
-                          : citedSourceNumbers.size}
-                      </span>
-                    </div>
-                    <div className="overflow-y-auto overflow-x-hidden pr-1 space-y-2 scrollbar-thin scrollbar-thumb-blue-200 dark:scrollbar-thumb-blue-800 scrollbar-track-transparent flex-1" style={{ minHeight: 0 }}>
-                      {enhancedResults.slice(0, 10)
+                <div className="lg:sticky lg:top-4 lg:self-start flex-shrink-0 w-full lg:w-[300px]" style={{ maxWidth: '100%' }}>
+                  <div className="rounded-2xl bg-[#eff3f8] p-4 flex flex-col gap-4">
+                    <div
+                      className="flex flex-col"
+                      style={
+                        // 如果处于“Show All”模式，增加最大高度与滚动
+                        isSourcesExpanded
+                          ? {
+                              maxHeight: 420,
+                              overflowY: 'auto'
+                            }
+                          : undefined
+                      }
+                    >
+                      {enhancedResults
                         .map((result, index) => ({ result, originalIndex: index + 1 }))
                         .filter(({ originalIndex }) => {
                           // 如果有筛选条件，只显示筛选的来源
                           if (filteredSourceNumbers) {
                             return filteredSourceNumbers.includes(originalIndex);
                           }
-                          // 否则只显示已被引用的来源
-                          return citedSourceNumbers.has(originalIndex);
+                          // 如果没有筛选，显示前3个或全部（如果展开）
+                          if (!isSourcesExpanded) {
+                            // 如果没有被引用筛选，且处于折叠状态，只显示前3个
+                            // 但如果当前是被引用的过滤状态，应该显示所有符合过滤条件的
+                            return true;
+                          }
+                          return true;
                         })
+                        // 如果没有过滤，且未展开，只取前3个
+                        .filter((_, idx) => filteredSourceNumbers || isSourcesExpanded || idx < 3)
                         .map(({ result, originalIndex }) => {
                         // 提取域名用于获取 favicon
                         const getDomain = (url: string) => {
@@ -484,92 +500,56 @@ export default function AIOverview({ query, results, onAIResponseComplete }: AIO
                         const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
 
                         return (
-                          <a
-                            key={originalIndex}
-                            href={result.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            data-source-number={originalIndex}
-                            className="flex items-start gap-2 p-2.5 rounded transition-all duration-200 group block animate-fade-in"
-                            style={{
-                              backgroundColor: 'var(--google-bg)',
-                              border: '1px solid var(--google-border-light)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.boxShadow = '0 1px 2px rgba(60,64,67,.3)';
-                              e.currentTarget.style.borderColor = 'var(--google-border)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.boxShadow = 'none';
-                              e.currentTarget.style.borderColor = 'var(--google-border-light)';
-                            }}
-                          >
-                            <span 
-                              className="flex-shrink-0 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center mt-0.5"
-                              style={{
-                                backgroundColor: '#e8f0fe',
-                                color: 'var(--google-blue)'
-                              }}
+                          <div key={originalIndex} className="py-3 border-b border-gray-200 last:border-0 first:pt-0">
+                            <a
+                              href={result.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              data-source-number={originalIndex}
+                              className="block group"
                             >
-                              {originalIndex}
-                            </span>
-                            <div className="flex-1 min-w-0 flex items-start gap-2">
-                              {/* 网站图标 */}
-                              <Image
-                                src={faviconUrl}
-                                alt=""
-                                width={16}
-                                height={16}
-                                className="rounded flex-shrink-0 mt-0.5"
-                                unoptimized
-                                onError={(e) => {
-                                  // 如果图标加载失败，隐藏图标
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p 
-                                  className="text-xs font-medium line-clamp-2 leading-tight"
-                                  style={{ color: 'var(--google-text)' }}
-                                >
-                                  {result.title}
-                                </p>
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <p 
-                                    className="text-[10px] truncate"
-                                    style={{ color: 'var(--google-text-secondary)' }}
-                                  >
-                                    {result.displayLink}
-                                  </p>
-                                  {/* 来源标签 */}
-                                  {result.searchSource && (
-                                    <span 
-                                      className="text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0"
-                                      style={{
-                                        backgroundColor: result.searchSource === 'tavily' ? '#f3e8ff' : '#e8f0fe',
-                                        color: result.searchSource === 'tavily' ? '#7c3aed' : 'var(--google-blue)',
-                                        border: result.searchSource === 'tavily' ? '1px solid #e9d5ff' : '1px solid #d2e3fc'
-                                      }}
-                                    >
-                                      {result.searchSource === 'tavily' ? '🎯 Tavily' : '🔍 Google'}
-                                    </span>
-                                  )}
+                              <h3 className="text-sm font-medium text-[#1f1f1f] mb-1 line-clamp-2 group-hover:text-blue-800 group-hover:underline decoration-blue-800">
+                                {result.title}
+                              </h3>
+                              <div className="text-xs text-[#444746] mb-2 line-clamp-2 leading-relaxed">
+                                {result.snippet}
+                              </div>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Image
+                                  src={faviconUrl}
+                                  alt=""
+                                  width={16}
+                                  height={16}
+                                  className="rounded-full flex-shrink-0"
+                                  unoptimized
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                                <span className="text-xs text-[#1f1f1f] font-medium truncate max-w-[150px]">
+                                  {result.displayLink || domain}
+                                </span>
+                                {/* 来源项的三个点菜单 (占位) */}
+                                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                                  </svg>
                                 </div>
                               </div>
-                            </div>
-                            <svg 
-                              className="flex-shrink-0 w-3 h-3 transition-colors mt-0.5" 
-                              style={{ color: 'var(--google-text-tertiary)' }}
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                          </a>
+                            </a>
+                          </div>
                         );
                       })}
                     </div>
+
+                    {!filteredSourceNumbers && enhancedResults.length > 3 && (
+                      <button
+                        onClick={() => setIsSourcesExpanded(!isSourcesExpanded)}
+                        className="w-full py-2 rounded-full bg-[#e2e7eb] text-sm font-medium text-[#1f1f1f] hover:bg-[#d3d3d3] transition-colors mt-2"
+                      >
+                        {isSourcesExpanded ? 'Collapse' : 'Show All'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

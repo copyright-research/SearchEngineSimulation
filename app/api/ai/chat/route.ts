@@ -173,6 +173,15 @@ RESPONSE GUIDELINES:
    - Use clear section headings that match the query context
    - No need to list the citation at the end.
 
+6. RELATED QUESTIONS:
+   - At the very end of your response, generate 3 follow-up questions that the user might want to ask next.
+   - These questions should be relevant to the topic and help the user explore further.
+   - Format them exactly like this:
+   __RELATED_QUESTIONS__
+   Question 1?
+   Question 2?
+   Question 3?
+
 EXAMPLE:
 Next.js 15 introduces significant improvements to performance and developer experience [1, 2, 3]. The release focuses on React 19 support and enhanced caching mechanisms [4, 5].
 
@@ -180,6 +189,11 @@ Next.js 15 introduces significant improvements to performance and developer expe
 - Turbopack integration for faster builds [1, 3]
 - Improved Server Components with streaming support [2, 4]
 - Enhanced Image Optimization [5, 6]
+
+__RELATED_QUESTIONS__
+What are the breaking changes in Next.js 15?
+How does Turbopack improve build times?
+Can I use Next.js 15 with existing React projects?
 
 Remember: Be helpful, accurate, maintain context awareness, and always cite your sources!`
       : `You are a helpful AI assistant. Unfortunately, I couldn't retrieve search results for: "${query}"

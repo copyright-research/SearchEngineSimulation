@@ -36,8 +36,17 @@ export function useSearchHistory() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Failed to save search history:', error);
+        let errorDetails;
+        try {
+          errorDetails = await response.json();
+        } catch (parseError) {
+          errorDetails = { 
+            status: response.status,
+            statusText: response.statusText,
+            text: await response.text().catch(() => '')
+          };
+        }
+        console.error('Failed to save search history:', errorDetails);
         return;
       }
 

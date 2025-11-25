@@ -371,18 +371,25 @@ export default function AIModePage() {
               {/* 消息列表 */}
               <div className="space-y-8 mb-6 flex-shrink-0 w-full">
                 {messages.map((message, index) => {
-                  // 提取文本内容
-                  const textContent = message.parts
+                  // Extract text content
+                  const fullText = message.parts
                     .filter((part) => part.type === 'text')
                     .map((part) => ('text' in part ? part.text : ''))
                     .join('');
 
-                  // 获取该消息对应的 sources
+                  // Parse related questions if present
+                  const parts = fullText.split('__RELATED_QUESTIONS__');
+                  const mainContent = parts[0];
+                  const relatedQuestions = parts[1] 
+                    ? parts[1].split('\n').filter(q => q.trim().length > 0).map(q => q.trim())
+                    : [];
+
+                  // Get sources for this message
                   const messageSources = message.role === 'assistant' 
                     ? messageSourcesMap[message.id] || []
                     : [];
 
-                  // 只有完成的消息才使用动画，流式输出时不使用
+                  // Only use animation for completed messages
                   const isStreaming = status === 'streaming' && index === messages.length - 1;
                   
                   return (
@@ -396,20 +403,20 @@ export default function AIModePage() {
                       }}
                     >
                       {message.role === 'user' ? (
-                        // 用户消息 - Google 风格
+                        // User message - Google style
                         <div className="mb-4">
                           <div className="text-xl" style={{ 
                             color: 'var(--google-text)',
                             fontFamily: 'Roboto, Arial, sans-serif',
                             fontWeight: 400
                           }}>
-                            {textContent}
+                            {mainContent}
                           </div>
                         </div>
                       ) : (
-                        // AI 回答 - Google AI Overview 风格
+                        // AI Answer - Google AI Overview style
                         <div className="flex flex-col lg:flex-row gap-5 items-start">
-                          {/* AI 回答内容 - 左侧 */}
+                          {/* AI Answer Content - Left Side */}
                           <div style={{ flex: '0 0 612px', maxWidth: '612px' }}>
                             {/* Header */}
                             <div 
@@ -449,7 +456,7 @@ export default function AIModePage() {
                               </div>
                             </div>
                             
-                            {/* Content - 复用 Response 组件 */}
+                            {/* Content - Reuse Response Component */}
                             <div style={{ color: 'var(--google-text)' }}>
                               <Response
                                 onCitationClick={(numbers) => {
@@ -459,14 +466,95 @@ export default function AIModePage() {
                                   setFilteredSourceNumbers(numbers);
                                 }}
                               >
-                                {textContent}
+                                {mainContent}
                               </Response>
                               
-                              {/* Loading 指示器 */}
+                              {/* Loading Indicator */}
                               {status === 'streaming' && index === messages.length - 1 && (
                                 <span className="inline-flex items-center ml-2 align-middle">
                                   <Loader size={14} className="text-blue-600" />
                                 </span>
+                              )}
+
+                              {/* Footer with Disclaimer and Feedback Buttons */}
+                              {!isStreaming && (
+                                <div className="flex items-center justify-between mt-6 pt-2">
+                                  <div className="text-[11px] text-[#70757a] font-roboto">
+                                    <span>AI responses may include mistakes. </span>
+                                    <a href="#" className="underline hover:text-[#4d5156]">Learn more</a>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button 
+                                      className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                                      aria-label="Good response"
+                                    >
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    </button>
+                                    <button 
+                                      className="p-2 text-[#70757a] hover:bg-[#f1f3f4] rounded-full transition-colors"
+                                      aria-label="Bad response"
+                                    >
+                                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Related Questions */}
+                              {relatedQuestions.length > 0 && (
+                                <div className="mt-8 pt-4 border-t border-gray-100/50">
+                                  <h4 
+                                    className="text-sm font-medium mb-3 uppercase tracking-wider"
+                                    style={{ 
+                                      color: 'var(--google-text-secondary)',
+                                      fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                                      fontSize: '11px'
+                                    }}
+                                  >
+                                    Related Questions
+                                  </h4>
+                                  <div className="flex flex-col gap-2">
+                                    {relatedQuestions.map((question, qIdx) => (
+                                      <button 
+                                        key={qIdx}
+                                        onClick={() => {
+                                          setFilteredSourceNumbers(null);
+                                          setActiveMessageId(null);
+                                          sendMessage({
+                                            parts: [{ type: 'text', text: question }],
+                                          });
+                                        }}
+                                        className="text-left py-3 px-4 rounded-xl transition-all duration-200 flex items-center group"
+                                        style={{
+                                          backgroundColor: 'var(--nvzc36, #f7f8fa)',
+                                          color: 'var(--google-text)',
+                                          fontFamily: 'Roboto, Arial, sans-serif',
+                                          fontSize: '14px'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.currentTarget.style.backgroundColor = '#e8eaed'; // darker gray on hover
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'var(--nvzc36, #f7f8fa)';
+                                        }}
+                                      >
+                                        <span className="flex-grow">{question}</span>
+                                        <svg 
+                                          className="w-4 h-4 ml-3 text-gray-400 group-hover:text-gray-600 transition-colors" 
+                                          fill="none" 
+                                          stroke="currentColor" 
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -564,10 +652,10 @@ export default function AIModePage() {
                                   }}
                                 >
                                   {(() => {
-                                    // 从 AI 回答中提取所有被引用的数字
-                                    const citedNumbersForDisplay = extractCitedNumbers(textContent);
+                                    // Extract all cited numbers from the AI answer (main content only)
+                                    const citedNumbersForDisplay = extractCitedNumbers(mainContent);
                                     
-                                    // 确定要显示的 sources
+                                    // Determine sources to display
                                     let displaySources: SearchResult[];
                                     let sourceNumbers: number[];
                                     
@@ -780,7 +868,7 @@ export default function AIModePage() {
               borderTop: '1px solid var(--google-border)'
             }}
           >
-            <div className="px-4 py-4" style={{ marginLeft: '182px', maxWidth: '912px' }}>
+            <div className="px-4 py-4" style={{ marginLeft: '182px', maxWidth: '1100px' }}>
               <form onSubmit={handleFormSubmit} className="relative">
                 <input
                   value={input}
