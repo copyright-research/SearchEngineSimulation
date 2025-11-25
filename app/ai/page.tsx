@@ -686,7 +686,7 @@ export default function AIModePage() {
                                 >
                                   {(() => {
                                     // 从 AI 回答中提取所有被引用的数字
-                                    const citedNumbersForDisplay = extractCitedNumbers(textContent);
+                                    const citedNumbersForDisplay = extractCitedNumbers(mainContent);
                                     
                                     // 确定要显示的 sources
                                     let displaySources: SearchResult[];
