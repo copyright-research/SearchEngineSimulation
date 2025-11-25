@@ -122,7 +122,7 @@ export default function AIModePage() {
             .map((part) => ('text' in part ? part.text : ''))
             .join('');
           
-          if (userQuery && sources.length > 0) {
+          if (userQuery) {
             saveSearchHistory(userQuery, 'ai' as const, sources, textContent)
               .then(id => {
                 if (id) {
