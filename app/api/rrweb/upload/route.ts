@@ -59,14 +59,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     // 详细的错误日志
     console.error('[rrweb] Upload error - Full details:');
-    console.error('Error type:', error?.constructor?.name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.error('Error type:', (error as any)?.constructor?.name);
     console.error('Error message:', error instanceof Error ? error.message : String(error));
     
     // 如果是 AWS SDK 错误，打印更多细节
     if (error && typeof error === 'object') {
-      console.error('Error code:', (error as any).code);
-      console.error('Error name:', (error as any).name);
-      console.error('Error $metadata:', JSON.stringify((error as any).$metadata, null, 2));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const awsError = error as any;
+      console.error('Error code:', awsError.code);
+      console.error('Error name:', awsError.name);
+      console.error('Error $metadata:', JSON.stringify(awsError.$metadata, null, 2));
       
       // AggregateError 特殊处理
       if (error instanceof AggregateError) {
@@ -74,9 +77,11 @@ export async function POST(request: NextRequest) {
         error.errors.forEach((err, index) => {
           console.error(`  Error ${index + 1}:`, err);
           if (err && typeof err === 'object') {
-            console.error(`    Code: ${(err as any).code}`);
-            console.error(`    Message: ${(err as any).message}`);
-            console.error(`    Stack: ${(err as any).stack}`);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const innerError = err as any;
+            console.error(`    Code: ${innerError.code}`);
+            console.error(`    Message: ${innerError.message}`);
+            console.error(`    Stack: ${innerError.stack}`);
           }
         });
       }
@@ -103,6 +108,7 @@ export async function POST(request: NextRequest) {
       { 
         error: 'Failed to upload recording chunk',
         details: error instanceof Error ? error.message : String(error),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         code: (error as any)?.code,
       },
       { status: 500 }
@@ -213,13 +219,16 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // 详细的错误日志
     console.error('[rrweb] Fetch error - Full details:');
-    console.error('Error type:', error?.constructor?.name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.error('Error type:', (error as any)?.constructor?.name);
     console.error('Error message:', error instanceof Error ? error.message : String(error));
     
     if (error && typeof error === 'object') {
-      console.error('Error code:', (error as any).code);
-      console.error('Error name:', (error as any).name);
-      console.error('Error $metadata:', JSON.stringify((error as any).$metadata, null, 2));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const awsError = error as any;
+      console.error('Error code:', awsError.code);
+      console.error('Error name:', awsError.name);
+      console.error('Error $metadata:', JSON.stringify(awsError.$metadata, null, 2));
       console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     }
     
@@ -231,6 +240,7 @@ export async function GET(request: NextRequest) {
       { 
         error: 'Failed to fetch recording',
         details: error instanceof Error ? error.message : String(error),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         code: (error as any)?.code,
       },
       { status: 500 }

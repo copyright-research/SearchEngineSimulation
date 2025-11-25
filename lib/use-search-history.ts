@@ -39,7 +39,7 @@ export function useSearchHistory() {
         let errorDetails;
         try {
           errorDetails = await response.json();
-        } catch (parseError) {
+        } catch {
           errorDetails = { 
             status: response.status,
             statusText: response.statusText,

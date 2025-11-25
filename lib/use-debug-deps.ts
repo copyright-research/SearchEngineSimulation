@@ -11,8 +11,10 @@ import { useEffect, useRef } from 'react';
  */
 export function useDebugDeps(
   componentName: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dependencies: Record<string, any>
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const previousDeps = useRef<Record<string, any>>({});
   const renderCount = useRef(0);
 
@@ -85,8 +87,10 @@ export function useDebugDeps(
  */
 export function useDebugDepsDeep(
   componentName: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dependencies: Record<string, any>
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const previousDeps = useRef<Record<string, any>>({});
   const renderCount = useRef(0);
 
@@ -105,7 +109,7 @@ export function useDebugDepsDeep(
       let deepEqual = false;
       try {
         deepEqual = JSON.stringify(currentValue) === JSON.stringify(previousValue);
-      } catch (e) {
+      } catch {
         deepEqual = false;
       }
 

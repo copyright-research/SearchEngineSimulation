@@ -90,13 +90,16 @@ export async function put(
     console.error('[R2] Upload failed - Full details:');
     console.error('Path:', path);
     console.error('Content size:', typeof content === 'string' ? content.length : content.length, 'bytes');
-    console.error('Error type:', error?.constructor?.name);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.error('Error type:', (error as any)?.constructor?.name);
     console.error('Error message:', error instanceof Error ? error.message : String(error));
     
     if (error && typeof error === 'object') {
-      console.error('Error code:', (error as any).code);
-      console.error('Error name:', (error as any).name);
-      console.error('Error $metadata:', JSON.stringify((error as any).$metadata, null, 2));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const awsError = error as any;
+      console.error('Error code:', awsError.code);
+      console.error('Error name:', awsError.name);
+      console.error('Error $metadata:', JSON.stringify(awsError.$metadata, null, 2));
       
       // AggregateError 特殊处理
       if (error instanceof AggregateError) {
@@ -104,8 +107,10 @@ export async function put(
         error.errors.forEach((err, index) => {
           console.error(`  Error ${index + 1}:`, err);
           if (err && typeof err === 'object') {
-            console.error(`    Code: ${(err as any).code}`);
-            console.error(`    Message: ${(err as any).message}`);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const innerError = err as any;
+            console.error(`    Code: ${innerError.code}`);
+            console.error(`    Message: ${innerError.message}`);
           }
         });
       }

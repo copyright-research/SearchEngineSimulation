@@ -22,8 +22,6 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
   const [isExpanded, setIsExpanded] = useState(true);
   const [showSources, setShowSources] = useState(true); // 默认展开
   const [filteredSourceNumbers, setFilteredSourceNumbers] = useState<number[] | null>(null);
-  const [citedSourceNumbers, setCitedSourceNumbers] = useState<Set<number>>(new Set());
-  const [sourcesMaxHeight, setSourcesMaxHeight] = useState<string>('600px');
   const [enhancedResults, setEnhancedResults] = useState<SearchResult[]>(results); // 混合搜索结果
   const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [shouldShowExpandButton, setShouldShowExpandButton] = useState(false);
@@ -47,10 +45,9 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
     return results.map(r => r.link).join('|');
   }, [results]);
 
-  // 实时提取已引用的来源编号
+    // 实时提取已引用的来源编号
   useEffect(() => {
     if (!completion) {
-      setCitedSourceNumbers(new Set());
       return;
     }
 
@@ -68,7 +65,7 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
       });
     }
 
-    setCitedSourceNumbers(cited);
+    // setCitedSourceNumbers(cited);
   }, [completion]);
 
   // 动态计算 Sources 的最大高度和检查是否需要展开按钮
@@ -77,8 +74,8 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
       if (contentRef.current) {
         const contentHeight = contentRef.current.scrollHeight;
         // Sources 高度不超过内容高度，最小 200px，最大 800px
-        const maxHeight = Math.min(Math.max(contentHeight, 200), 800);
-        setSourcesMaxHeight(`${maxHeight}px`);
+        // const maxHeight = Math.min(Math.max(contentHeight, 200), 800);
+        // setSourcesMaxHeight(`${maxHeight}px`);
         
         // 检查内容是否超过折叠高度
         if (contentHeight > COLLAPSED_HEIGHT) {

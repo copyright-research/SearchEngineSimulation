@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
 import SearchResults from '@/components/SearchResults';
 import AIOverview from '@/components/AIOverview';
@@ -106,7 +107,7 @@ function HomeContent() {
             /* Google 搜索结果页面布局：Logo 和 SearchBar 在同一行 */
             <div className="flex items-center gap-8 mb-4" style={{ maxWidth: '1140px' }}>
               {/* Logo - 左侧 */}
-              <a href="/" className="flex-shrink-0">
+              <Link href="/" className="flex-shrink-0">
                 <h1 className="text-2xl" style={{ 
                   fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
                   fontWeight: 400,
@@ -122,7 +123,7 @@ function HomeContent() {
                   <span style={{ color: '#4285f4' }}>c</span>
                   <span style={{ color: '#fbbc04' }}>h</span>
                 </h1>
-              </a>
+              </Link>
               
               {/* SearchBar - 右侧，占据剩余空间 */}
               <div className="flex-1" style={{ maxWidth: '692px' }}>
@@ -148,7 +149,7 @@ function HomeContent() {
                   <span style={{ color: '#4285f4' }}>c</span>
                   <span style={{ color: '#fbbc04' }}>h</span>
                 </h1>
-                <a
+                <Link
                   href="/ai"
                   className="px-4 py-2 text-sm font-medium rounded transition-colors"
                   style={{
@@ -165,7 +166,7 @@ function HomeContent() {
                   }}
                 >
                   Try AI Mode
-                </a>
+                </Link>
               </div>
               
               <SearchBar onSearch={handleSearch} isLoading={isLoading} />

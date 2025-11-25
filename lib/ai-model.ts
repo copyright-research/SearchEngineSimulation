@@ -31,11 +31,11 @@ const DEFAULT_MODEL = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
  */
 export function getModel(modelName: string = DEFAULT_MODEL): LanguageModel {
   // 自动推断 provider
-  if (GROQ_MODELS.includes(modelName as any)) {
+  if (GROQ_MODELS.includes(modelName as typeof GROQ_MODELS[number])) {
     return groq(modelName);
   }
   
-  if (GOOGLE_MODELS.includes(modelName as any)) {
+  if (GOOGLE_MODELS.includes(modelName as typeof GOOGLE_MODELS[number])) {
     return google(modelName);
   }
   

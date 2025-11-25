@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
     console.error('[rrweb] Download error:', error);
     
     // 如果是 NoSuchKey 错误，返回 404
-    if (error && typeof error === 'object' && (error as any).name === 'NoSuchKey') {
+    const errorObj = error as { name?: string };
+    if (error && typeof error === 'object' && errorObj.name === 'NoSuchKey') {
       return NextResponse.json(
         { error: 'File not found' },
         { status: 404 }
