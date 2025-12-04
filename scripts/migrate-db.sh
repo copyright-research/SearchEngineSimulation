@@ -7,18 +7,12 @@ set -e
 
 echo "🔄 Running database migrations..."
 
-# 检查 .env.local 是否存在
-if [ ! -f .env.local ]; then
-    echo "❌ .env.local not found!"
-    echo "Please create .env.local with DATABASE_URL"
-    exit 1
-fi
 
 # 加载环境变量
-export $(cat .env.local | grep DATABASE_URL | xargs)
+export $(cat .env | grep DATABASE_URL | xargs)
 
 if [ -z "$DATABASE_URL" ]; then
-    echo "❌ DATABASE_URL not found in .env.local"
+    echo "❌ DATABASE_URL not found in .env"
     exit 1
 fi
 
