@@ -18,8 +18,30 @@ const ipLimiter = rateLimit({
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. 全局每日限制检查（优先）
-    const globalCheck = globalLimiter.check('global');
+    // 1. 验证查询参数
+    const searchParams = request.nextUrl.searchParams;
+    const query = searchParams.get('q');
+    const start = searchParams.get('start');
+
+    if (!query) {
+      return NextResponse.json(
+        { error: 'Search query is required' },
+        { status: 400 }
+      );
+    }
+
+    // 2. 查询长度限制（防止恶意超长查询）
+    if (query.length > 200) {
+      return NextResponse.json(
+        { error: 'Search query is too long (max 200 characters)' },
+        { status: 400 }
+      );
+    }
+
+    const startIndex = start ? parseInt(start, 10) : 1;
+
+    // 3. 仅在即将调用外部搜索 API 时进行限流计数
+    const globalCheck = globalLimiter.check('search:global');
     if (!globalCheck.success) {
       const resetDate = new Date(globalCheck.resetTime);
       return NextResponse.json(
@@ -37,10 +59,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 2. 单个 IP 限制检查
     const clientIp = getClientIp(request);
-    const ipCheck = ipLimiter.check(clientIp);
-
+    const ipCheck = ipLimiter.check(`search:${clientIp}`);
     if (!ipCheck.success) {
       const resetDate = new Date(ipCheck.resetTime);
       return NextResponse.json(
@@ -60,32 +80,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. 验证查询参数
-    const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('q');
-    const start = searchParams.get('start');
-
-    if (!query) {
-      return NextResponse.json(
-        { error: 'Search query is required' },
-        { status: 400 }
-      );
-    }
-
-    // 4. 查询长度限制（防止恶意超长查询）
-    if (query.length > 200) {
-      return NextResponse.json(
-        { error: 'Search query is too long (max 200 characters)' },
-        { status: 400 }
-      );
-    }
-
-    const startIndex = start ? parseInt(start, 10) : 1;
-
-    // 5. 执行 Google 搜索（organic 结果）
+    // 4. 执行 Google 搜索（organic 结果）
     const googleResponse = await searchGoogle(query, startIndex);
 
-    // 6. 返回结果，带上 Rate Limit 信息
+    // 5. 返回结果，带上 Rate Limit 信息
     return NextResponse.json(googleResponse, {
       headers: {
         'X-RateLimit-Limit': '10',

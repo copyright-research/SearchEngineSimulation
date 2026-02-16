@@ -18,31 +18,7 @@ const chatLimiter = rateLimit({
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Rate limiting 检查
-    const clientIp = getClientIp(req);
-    const rateLimitCheck = chatLimiter.check(clientIp);
-
-    if (!rateLimitCheck.success) {
-      const resetDate = new Date(rateLimitCheck.resetTime);
-      return new Response(
-        JSON.stringify({
-          error: 'Too many requests. Please try again later.',
-          resetAt: resetDate.toISOString(),
-        }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-RateLimit-Limit': '20',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': resetDate.toISOString(),
-            'Retry-After': Math.ceil((rateLimitCheck.resetTime - Date.now()) / 1000).toString(),
-          },
-        }
-      );
-    }
-
-    // 2. 验证请求数据
+    // 1. 验证请求数据
     const { messages }: { messages: UIMessage[] } = await req.json();
 
     if (!messages || messages.length === 0) {
@@ -66,13 +42,37 @@ export async function POST(req: NextRequest) {
       return new Response('Query is too long (max 500 characters)', { status: 400 });
     }
 
-    // 检查是否启用 debug 模式
+    // 2. 检查是否启用 debug 模式
     const url = new URL(req.url);
     const debug = url.searchParams.get('debug') === 'true';
 
     console.log('AI Chat request:', { query, messagesCount: messages.length, debug });
 
-    // 1. 智能关键词生成：如果是上下文相关问题，生成优化的搜索查询
+    // 3. 仅在即将调用外部搜索/LLM前进行限流计数
+    const clientIp = getClientIp(req);
+    const rateLimitCheck = chatLimiter.check(`chat:${clientIp}`);
+
+    if (!rateLimitCheck.success) {
+      const resetDate = new Date(rateLimitCheck.resetTime);
+      return new Response(
+        JSON.stringify({
+          error: 'Too many requests. Please try again later.',
+          resetAt: resetDate.toISOString(),
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-RateLimit-Limit': '20',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': resetDate.toISOString(),
+            'Retry-After': Math.ceil((rateLimitCheck.resetTime - Date.now()) / 1000).toString(),
+          },
+        }
+      );
+    }
+
+    // 4. 智能关键词生成：如果是上下文相关问题，生成优化的搜索查询
     let searchQuery = query;
     const historyMessages = messages.slice(0, -1); // 排除当前消息
     
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       searchQuery = await generateSearchQuery(query, historyMessages);
     }
 
-    // 2. 执行混合搜索（Google + Tavily）
+    // 5. 执行混合搜索（Google + Tavily）
     let searchResults: SearchResult[] = [];
     try {
       searchResults = await hybridSearch(searchQuery, async (q) => {
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       // 继续执行，但没有搜索结果
     }
 
-    // 3. 构建 grounding context（当前搜索结果）
+    // 6. 构建 grounding context（当前搜索结果）
     const context = searchResults
       .slice(0, 10)
       .map((result, index) => {
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       })
       .join('\n\n');
 
-    // 4. 构建对话历史上下文（不包含搜索结果，只有问答内容）
+    // 7. 构建对话历史上下文（不包含搜索结果，只有问答内容）
     let conversationHistory = '';
     if (messages.length > 1) {
       // 获取除了最后一条消息外的所有历史消息
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
         }).join('\n\n');
     }
 
-    // 5. 构建系统提示词（Perplexity 风格 + 对话上下文）
+    // 8. 构建系统提示词（Perplexity 风格 + 对话上下文）
     const searchQueryInfo = searchQuery !== query 
       ? `\n(Search query optimized from: "${query}" to: "${searchQuery}")`
       : '';
@@ -201,11 +201,11 @@ ${conversationHistory}
 
 Please provide a brief answer based on general knowledge and the conversation history above, but clearly mention that you don't have access to current/specific information about this topic.`;
 
-    // 5. 准备消息历史
+    // 9. 准备消息历史
     // 将 UIMessage 转换为 ModelMessage
     const modelMessages = convertToModelMessages(messages);
 
-    // 6. 调用 AI 模型生成回答
+    // 10. 调用 AI 模型生成回答
     const model = getChatModel();
     
     const result = streamText({
@@ -222,7 +222,7 @@ Please provide a brief answer based on general knowledge and the conversation hi
       },
     });
 
-    // 7. 返回 UI Message Stream 响应（AI SDK 5 标准格式）
+    // 11. 返回 UI Message Stream 响应（AI SDK 5 标准格式）
     // 将搜索结果编码到响应头中（使用 UTF-8）
     const sourcesToSend = searchResults.slice(0, 10);
     const encodedSources = Buffer.from(JSON.stringify(sourcesToSend), 'utf-8').toString('base64');
@@ -251,4 +251,3 @@ Please provide a brief answer based on general knowledge and the conversation hi
     );
   }
 }
-

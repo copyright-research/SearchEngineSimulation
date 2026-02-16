@@ -20,39 +20,14 @@ export async function POST(req: NextRequest) {
   console.log(`[Overview API ${requestId}] 📥 Request received`);
   
   try {
-    // 1. Rate limiting 检查
-    const clientIp = getClientIp(req);
-    const rateLimitCheck = overviewLimiter.check(clientIp);
-    console.log(`[Overview API ${requestId}] Client IP: ${clientIp}, Rate limit remaining: ${rateLimitCheck.remaining}`);
-
-    if (!rateLimitCheck.success) {
-      const resetDate = new Date(rateLimitCheck.resetTime);
-      return new Response(
-        JSON.stringify({
-          error: 'Too many requests. Please try again later.',
-          resetAt: resetDate.toISOString(),
-        }),
-        {
-          status: 429,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-RateLimit-Limit': '30',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': resetDate.toISOString(),
-            'Retry-After': Math.ceil((rateLimitCheck.resetTime - Date.now()) / 1000).toString(),
-          },
-        }
-      );
-    }
-
-    // 2. 检查请求体是否存在
+    // 1. 检查请求体是否存在
     const contentType = req.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       console.error('Invalid content type:', contentType);
       return new Response('Content-Type must be application/json', { status: 400 });
     }
 
-    // 尝试读取请求体
+    // 2. 尝试读取请求体
     let body;
     try {
       const text = await req.text();
@@ -74,6 +49,31 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[Overview API ${requestId}] 📝 Query: "${query}", Results count: ${results?.length || 0}`);
+
+    // 3. 仅在即将调用外部搜索/LLM前进行限流计数
+    const clientIp = getClientIp(req);
+    const rateLimitCheck = overviewLimiter.check(`overview:${clientIp}`);
+    console.log(`[Overview API ${requestId}] Client IP: ${clientIp}, Rate limit remaining: ${rateLimitCheck.remaining}`);
+
+    if (!rateLimitCheck.success) {
+      const resetDate = new Date(rateLimitCheck.resetTime);
+      return new Response(
+        JSON.stringify({
+          error: 'Too many requests. Please try again later.',
+          resetAt: resetDate.toISOString(),
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-RateLimit-Limit': '30',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': resetDate.toISOString(),
+            'Retry-After': Math.ceil((rateLimitCheck.resetTime - Date.now()) / 1000).toString(),
+          },
+        }
+      );
+    }
 
     // 使用混合搜索（Google + Tavily）获取更高质量的结果用于 AI Overview
     console.log(`[Overview API ${requestId}] 🔍 Using hybrid search for:`, query);
