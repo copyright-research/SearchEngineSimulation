@@ -31,9 +31,15 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isRequestInProgressRef = useRef(false);
+  const onAIResponseCompleteRef = useRef(onAIResponseComplete);
   const COLLAPSED_HEIGHT = 300; // 折叠时的最大高度（像素）
 
   const { reportFeedback } = useSearchHistory();
+
+  // 保持回调引用最新，避免流结束时使用到旧闭包（例如旧的 historyId）
+  useEffect(() => {
+    onAIResponseCompleteRef.current = onAIResponseComplete;
+  }, [onAIResponseComplete]);
 
   // 🔍 Debug: 追踪依赖项变化
   useDebugDepsDeep('AIOverview', { query, results });
@@ -204,8 +210,8 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
         console.log('[AIOverview] ✨ Overview generation completed');
         
         // 通知父组件AI回答已完成
-        if (onAIResponseComplete && fullResponse) {
-          onAIResponseComplete(fullResponse);
+        if (onAIResponseCompleteRef.current && fullResponse) {
+          onAIResponseCompleteRef.current(fullResponse);
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
