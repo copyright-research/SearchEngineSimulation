@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
@@ -23,31 +23,23 @@ function HomeContent() {
   const [currentQuery, setCurrentQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   
-  // 从 URL 参数读取是否显示 AI Overview，默认显示
-  const [showAIOverview, setShowAIOverview] = useState(true);
+  const [initialQuery, setInitialQuery] = useState('');
   const [aiHistoryId, setAiHistoryId] = useState<number | null>(null);
   
   // 搜索历史保存
-  const { saveSearchHistory } = useSearchHistory();
-  
-  useEffect(() => {
-    // 大小写不敏感获取 ai 参数
-    let aiParam: string | null = null;
-    for (const [key, value] of searchParams.entries()) {
-      if (key.toLowerCase() === 'ai') {
-        aiParam = value;
-        break;
-      }
-    }
-    // ai=0 或 ai=false 时隐藏，其他情况（包括未设置）都显示
-    if (aiParam === '0' || aiParam === 'false') {
-      setShowAIOverview(false);
-    } else {
-      setShowAIOverview(true);
-    }
-  }, [searchParams]);
+  const { saveSearchHistory, updateAIResponse } = useSearchHistory();
 
-  const handleSearch = async (query: string, page: number = 1) => {
+  // 从 URL 参数读取是否显示 AI Overview，默认显示
+  let aiParam: string | null = null;
+  for (const [key, value] of searchParams.entries()) {
+    if (key.toLowerCase() === 'ai') {
+      aiParam = value;
+      break;
+    }
+  }
+  const showAIOverview = !(aiParam === '0' || aiParam === 'false');
+
+  const handleSearch = useCallback(async (query: string, page: number = 1) => {
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
@@ -78,9 +70,15 @@ function HomeContent() {
       // 保存搜索历史（异步，不阻塞UI）- 只在第一页保存
       if (searchResults.length > 0 && page === 1) {
         const mode = showAIOverview ? 'search_with_overview' : 'search';
-        saveSearchHistory(query, mode, searchResults).catch(err => {
-          console.error('Failed to save search history:', err);
-        });
+        saveSearchHistory(query, mode, searchResults)
+          .then(historyId => {
+            if (mode === 'search_with_overview' && historyId) {
+              setAiHistoryId(historyId);
+            }
+          })
+          .catch(err => {
+            console.error('Failed to save search history:', err);
+          });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed, please try again later');
@@ -88,7 +86,25 @@ function HomeContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [saveSearchHistory, showAIOverview]);
+
+  useEffect(() => {
+    // 支持从 Qualtrics URL 注入首个搜索词，默认参数为 q
+    // 同时兼容 query/topic/keyword 作为候选参数名
+    let seededQuery = '';
+    const candidateKeys = new Set(['q', 'query', 'topic', 'keyword']);
+    for (const [key, value] of searchParams.entries()) {
+      if (candidateKeys.has(key.toLowerCase())) {
+        seededQuery = value.trim();
+        break;
+      }
+    }
+
+    setInitialQuery(seededQuery);
+
+    if (!seededQuery || hasSearched) return;
+    handleSearch(seededQuery, 1);
+  }, [searchParams, hasSearched, handleSearch]);
 
   const handlePageChange = (page: number) => {
     if (currentQuery) {
@@ -127,7 +143,7 @@ function HomeContent() {
               
               {/* SearchBar - 右侧，占据剩余空间 */}
               <div className="flex-1" style={{ maxWidth: '692px' }}>
-                <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+                <SearchBar onSearch={handleSearch} isLoading={isLoading} initialQuery={initialQuery} />
               </div>
             </div>
           ) : (
@@ -169,7 +185,7 @@ function HomeContent() {
                 </Link>
               </div>
               
-              <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+              <SearchBar onSearch={handleSearch} isLoading={isLoading} initialQuery={initialQuery} />
             </div>
           )}
         </header>
@@ -183,7 +199,15 @@ function HomeContent() {
               results={results}
               historyId={aiHistoryId}
               onAIResponseComplete={(aiResponse) => {
-                // 当AI回答完成时，保存带有AI回答的搜索历史
+                // 当 AI 回答完成时，优先更新首次搜索记录，避免重复写入
+                if (aiHistoryId) {
+                  updateAIResponse(aiHistoryId, aiResponse).catch(err => {
+                    console.error('Failed to update AI response:', err);
+                  });
+                  return;
+                }
+
+                // 极端情况下首条记录未创建成功，回退为新建一条完整记录
                 saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse)
                   .then(id => {
                     if (id) setAiHistoryId(id);

@@ -22,6 +22,7 @@ export default function AIModePage() {
   const [filteredSourceNumbers, setFilteredSourceNumbers] = useState<number[] | null>(null);
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null); // 追踪哪个消息的引用被点击了
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasAutoPromptedRef = useRef(false);
   
   // 存储最新的响应头（用于获取 sources）
   const latestResponseHeadersRef = useRef<Headers | null>(null);
@@ -165,6 +166,32 @@ export default function AIModePage() {
   });
 
   const [input, setInput] = useState('');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (hasAutoPromptedRef.current) return;
+    if (messages.length > 0 || status !== 'ready') return;
+
+    // 支持从 URL 注入首个问题，默认参数为 q
+    // 同时兼容 query/topic/keyword
+    const searchParams = new URLSearchParams(window.location.search);
+    const candidateKeys = new Set(['q', 'query', 'topic', 'keyword']);
+
+    let seededQuery = '';
+    for (const [key, value] of searchParams.entries()) {
+      if (candidateKeys.has(key.toLowerCase())) {
+        seededQuery = value.trim();
+        break;
+      }
+    }
+
+    if (!seededQuery) return;
+    hasAutoPromptedRef.current = true;
+
+    sendMessage({
+      parts: [{ type: 'text', text: seededQuery }],
+    });
+  }, [messages.length, sendMessage, status]);
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

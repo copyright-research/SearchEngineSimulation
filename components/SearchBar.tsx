@@ -13,6 +13,10 @@ export default function SearchBar({ onSearch, isLoading, initialQuery = '' }: Se
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
+  useEffect(() => {
     // 键盘快捷键：按 / 聚焦搜索框
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === '/' && document.activeElement !== inputRef.current) {

@@ -200,3 +200,16 @@ export async function updateSearchHistoryFeedback(
     data: { feedback },
   });
 }
+
+/**
+ * 更新搜索历史的 AI 回答内容
+ */
+export async function updateSearchHistoryAIResponse(
+  historyId: number,
+  aiResponse: string
+) {
+  return await prisma.searchHistory.update({
+    where: { id: historyId },
+    data: { aiResponse },
+  });
+}

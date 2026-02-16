@@ -87,5 +87,33 @@ export function useSearchHistory() {
     }
   }, []);
 
-  return { saveSearchHistory, reportFeedback };
+  const updateAIResponse = useCallback(async (
+    historyId: number,
+    aiResponse: string
+  ) => {
+    try {
+      const response = await fetch('/api/history/update-ai-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          historyId,
+          aiResponse,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to update AI response');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Failed to update AI response:', error);
+      return false;
+    }
+  }, []);
+
+  return { saveSearchHistory, reportFeedback, updateAIResponse };
 }
