@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveSearchHistory, saveVerificationQuestions } from '@/lib/db';
-import { generateVerificationQuestions } from '@/lib/question-generator';
-import type { SearchResult } from '@/types/search';
+import { saveSearchHistory } from '@/lib/db';
 
 /**
- * 保存搜索历史并生成验证问题
+ * 保存搜索历史
  * POST /api/history/save
- * 
+ *
  * Body: {
  *   rid: string;
  *   query: string;
@@ -45,21 +43,10 @@ export async function POST(request: NextRequest) {
       aiResponse
     );
 
-    // 异步生成验证问题（不阻塞响应）
-    generateAndSaveQuestions(
-      rid,
-      query,
-      results,
-      aiResponse,
-      mode
-    ).catch(error => {
-      console.error('Failed to generate questions in background:', error);
-    });
-
     return NextResponse.json({
       success: true,
       searchHistoryId: searchHistory.id,
-      message: 'Search history saved. Questions are being generated in the background.',
+      message: 'Search history saved.',
     });
   } catch (error) {
     console.error('Failed to save search history:', error);
@@ -72,38 +59,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-/**
- * 后台生成并保存验证问题
- */
-async function generateAndSaveQuestions(
-  rid: string,
-  query: string,
-  results: SearchResult[],
-  aiResponse: string | undefined,
-  mode: string
-) {
-  try {
-    console.log(`Generating questions for RID: ${rid}, mode: ${mode}`);
-    
-    // 生成问题
-    const questionsResponse = await generateVerificationQuestions(
-      query,
-      results,
-      aiResponse,
-      mode
-    );
-
-    // 保存到数据库
-    await saveVerificationQuestions(
-      rid,
-      questionsResponse.questions
-    );
-
-    console.log(`Generated and saved ${questionsResponse.questions.length} questions for RID: ${rid}`);
-  } catch (error) {
-    console.error('Failed to generate and save questions:', error);
-    throw error;
-  }
-}
-
