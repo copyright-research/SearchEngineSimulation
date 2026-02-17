@@ -213,3 +213,95 @@ export async function updateSearchHistoryAIResponse(
     data: { aiResponse },
   });
 }
+
+/**
+ * 按 query 获取缓存的搜索结果（优先返回已有 AI Overview 的记录）
+ */
+export async function getCachedSearchResultsByQuery(
+  query: string
+): Promise<SearchResult[] | null> {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) return null;
+
+  const withOverview = await prisma.searchHistory.findFirst({
+    where: {
+      query: {
+        equals: normalizedQuery,
+        mode: 'insensitive',
+      },
+      mode: 'search_with_overview',
+      aiResponse: {
+        not: null,
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      results: true,
+    },
+  });
+
+  const fallback = withOverview ?? await prisma.searchHistory.findFirst({
+    where: {
+      query: {
+        equals: normalizedQuery,
+        mode: 'insensitive',
+      },
+      mode: {
+        in: ['search', 'search_with_overview'],
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      results: true,
+    },
+  });
+
+  if (!fallback || !Array.isArray(fallback.results)) {
+    return null;
+  }
+
+  return fallback.results as unknown as SearchResult[];
+}
+
+/**
+ * 按 query 获取缓存的 AI Overview（包含对应结果）
+ */
+export async function getCachedOverviewByQuery(
+  query: string
+): Promise<{ results: SearchResult[]; aiResponse: string } | null> {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) return null;
+
+  const cached = await prisma.searchHistory.findFirst({
+    where: {
+      query: {
+        equals: normalizedQuery,
+        mode: 'insensitive',
+      },
+      mode: 'search_with_overview',
+      aiResponse: {
+        not: null,
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      results: true,
+      aiResponse: true,
+    },
+  });
+
+  if (!cached || !cached.aiResponse || !Array.isArray(cached.results)) {
+    return null;
+  }
+
+  return {
+    results: cached.results as unknown as SearchResult[],
+    aiResponse: cached.aiResponse,
+  };
+}

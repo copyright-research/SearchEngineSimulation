@@ -4,6 +4,7 @@ import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { hybridSearch } from '@/lib/tavily-search';
 import { searchGoogle } from '@/lib/google-search';
 import { getOverviewModel } from '@/lib/ai-model';
+import { getCachedOverviewByQuery } from '@/lib/db';
 import type { SearchResult } from '@/types/search';
 
 // Removed edge runtime as it's not compatible with the AI SDK
@@ -50,7 +51,26 @@ export async function POST(req: NextRequest) {
 
     console.log(`[Overview API ${requestId}] 📝 Query: "${query}", Results count: ${results?.length || 0}`);
 
-    // 3. 仅在即将调用外部搜索/LLM前进行限流计数
+    // 3. 先查缓存（命中则直接返回，不调用外部搜索/LLM）
+    const cachedOverview = await getCachedOverviewByQuery(query);
+    if (cachedOverview) {
+      console.log(`[Overview API ${requestId}] ♻️ Cache hit for query: "${query}"`);
+
+      const encodedResults = Buffer
+        .from(JSON.stringify(cachedOverview.results.slice(0, 10)), 'utf-8')
+        .toString('base64');
+
+      return new Response(cachedOverview.aiResponse, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'X-Cache-Hit': '1',
+          'X-Cache-Source': 'search_history',
+          'X-Search-Results': encodedResults,
+        },
+      });
+    }
+
+    // 4. 仅在即将调用外部搜索/LLM前进行限流计数
     const clientIp = getClientIp(req);
     const rateLimitCheck = overviewLimiter.check(`overview:${clientIp}`);
     console.log(`[Overview API ${requestId}] Client IP: ${clientIp}, Rate limit remaining: ${rateLimitCheck.remaining}`);

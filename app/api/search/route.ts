@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchGoogle } from '@/lib/google-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
+import { getCachedSearchResultsByQuery } from '@/lib/db';
+import type { GoogleSearchResponse } from '@/types/search';
 
 // 全局每日限制（保护 Google API 免费额度）
 // Google 免费额度: 100 次/天，这里设置 90 次保留缓冲
@@ -40,7 +42,53 @@ export async function GET(request: NextRequest) {
 
     const startIndex = start ? parseInt(start, 10) : 1;
 
-    // 3. 仅在即将调用外部搜索 API 时进行限流计数
+    // 3. 先查缓存（命中则不调用外部 API，也不消耗限流配额）
+    if (startIndex === 1) {
+      const cachedResults = await getCachedSearchResultsByQuery(query);
+      if (cachedResults && cachedResults.length > 0) {
+        const cachedResponse: GoogleSearchResponse = {
+          kind: 'customsearch#search',
+          url: {
+            type: 'application/json',
+            template: '',
+          },
+          queries: {
+            request: [
+              {
+                title: `Google Custom Search - ${query}`,
+                totalResults: String(cachedResults.length),
+                searchTerms: query,
+                count: cachedResults.length,
+                startIndex: 1,
+                inputEncoding: 'utf8',
+                outputEncoding: 'utf8',
+                safe: 'off',
+                cx: 'cached',
+              },
+            ],
+          },
+          context: {
+            title: 'cached',
+          },
+          searchInformation: {
+            searchTime: 0,
+            formattedSearchTime: '0.00',
+            totalResults: String(cachedResults.length),
+            formattedTotalResults: String(cachedResults.length),
+          },
+          items: cachedResults,
+        };
+
+        return NextResponse.json(cachedResponse, {
+          headers: {
+            'X-Cache-Hit': '1',
+            'X-Cache-Source': 'search_history',
+          },
+        });
+      }
+    }
+
+    // 4. 仅在即将调用外部搜索 API 时进行限流计数
     const globalCheck = globalLimiter.check('search:global');
     if (!globalCheck.success) {
       const resetDate = new Date(globalCheck.resetTime);
@@ -80,10 +128,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 4. 执行 Google 搜索（organic 结果）
+    // 5. 执行 Google 搜索（organic 结果）
     const googleResponse = await searchGoogle(query, startIndex);
 
-    // 5. 返回结果，带上 Rate Limit 信息
+    // 6. 返回结果，带上 Rate Limit 信息
     return NextResponse.json(googleResponse, {
       headers: {
         'X-RateLimit-Limit': '10',
