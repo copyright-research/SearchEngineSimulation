@@ -101,7 +101,7 @@ export default function SearchResults({
 
   return (
     <div className="w-full mt-6 mb-12" style={{ maxWidth: '652px' }}>
-      {searchTime && totalResults && (
+      {typeof searchTime === 'number' && typeof totalResults === 'string' && (
         <div className="text-sm mb-4 px-1" style={{ color: 'var(--google-text-secondary)' }}>
           About <span style={{ color: 'var(--google-text)' }}>{totalResults}</span> results
           <span style={{ color: 'var(--google-text-tertiary)' }}> ({searchTime.toFixed(2)} seconds)</span>
