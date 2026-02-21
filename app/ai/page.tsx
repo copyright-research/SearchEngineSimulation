@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { Suspense, useState, useRef, useEffect, useMemo } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import Image from 'next/image';
@@ -13,7 +13,7 @@ import type { SearchResult } from '@/types/search';
 import { useSearchHistory } from '@/lib/use-search-history';
 import { getParamCaseInsensitive } from '@/lib/url-utils';
 
-export default function AIModePage() {
+function AIModePageContent() {
   const searchParams = useSearchParams();
 
   // 为每条消息存储对应的 sources（使用消息 ID 作为 key）
@@ -1053,5 +1053,19 @@ export default function AIModePage() {
       {/* rrweb 录制器 */}
       <RRWebRecorder />
     </div>
+  );
+}
+
+export default function AIModePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--google-bg)' }}>
+          <div style={{ color: 'var(--google-text-secondary)' }}>Loading AI page...</div>
+        </div>
+      }
+    >
+      <AIModePageContent />
+    </Suspense>
   );
 }
