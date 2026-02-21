@@ -206,11 +206,19 @@ export async function updateSearchHistoryFeedback(
  */
 export async function updateSearchHistoryAIResponse(
   historyId: number,
-  aiResponse: string
+  aiResponse: string,
+  results?: SearchResult[]
 ) {
+  const hasResults = Array.isArray(results) && results.length > 0;
+
   return await prisma.searchHistory.update({
     where: { id: historyId },
-    data: { aiResponse },
+    data: hasResults
+      ? {
+          aiResponse,
+          results: JSON.parse(JSON.stringify(results)),
+        }
+      : { aiResponse },
   });
 }
 

@@ -11,7 +11,7 @@ import { useSearchHistory } from '@/lib/use-search-history';
 interface AIOverviewProps {
   query: string;
   results: SearchResult[];
-  onAIResponseComplete?: (response: string) => void;
+  onAIResponseComplete?: (response: string, overviewResults?: SearchResult[]) => void;
   historyId?: number | null;
 }
 
@@ -31,7 +31,7 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
   const abortControllerRef = useRef<AbortController | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isRequestInProgressRef = useRef(false);
-  const onAIResponseCompleteRef = useRef(onAIResponseComplete);
+  const onAIResponseCompleteRef = useRef<AIOverviewProps['onAIResponseComplete']>(onAIResponseComplete);
   const COLLAPSED_HEIGHT = 300; // 折叠时的最大高度（像素）
 
   const { reportFeedback } = useSearchHistory();
@@ -133,8 +133,11 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
       setError(null);
       setCompletion('');
       setUserFeedback(null); // Reset feedback on new generation
+      setEnhancedResults(results);
 
       try {
+        let resultsUsedForCitations: SearchResult[] = results.slice(0, 10);
+
         // 准备请求数据
         const requestData = {
           query: query.trim(),
@@ -176,9 +179,10 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
               bytes[i] = binaryString.charCodeAt(i);
             }
             const decodedString = new TextDecoder('utf-8').decode(bytes);
-            const decodedResults = JSON.parse(decodedString);
+            const decodedResults = JSON.parse(decodedString) as SearchResult[];
             
-            if (decodedResults && decodedResults.length > 0) {
+            if (Array.isArray(decodedResults) && decodedResults.length > 0) {
+              resultsUsedForCitations = decodedResults;
               setEnhancedResults(decodedResults);
               console.log('[AIOverview] 📚 Loaded enhanced results from response header:', decodedResults.length);
             }
@@ -211,7 +215,7 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
         
         // 通知父组件AI回答已完成
         if (onAIResponseCompleteRef.current && fullResponse) {
-          onAIResponseCompleteRef.current(fullResponse);
+          onAIResponseCompleteRef.current(fullResponse, resultsUsedForCitations);
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {

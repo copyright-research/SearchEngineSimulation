@@ -89,18 +89,29 @@ export function useSearchHistory() {
 
   const updateAIResponse = useCallback(async (
     historyId: number,
-    aiResponse: string
+    aiResponse: string,
+    results?: SearchResult[]
   ) => {
     try {
+      const payload: {
+        historyId: number;
+        aiResponse: string;
+        results?: SearchResult[];
+      } = {
+        historyId,
+        aiResponse,
+      };
+
+      if (results && results.length > 0) {
+        payload.results = results;
+      }
+
       const response = await fetch('/api/history/update-ai-response', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          historyId,
-          aiResponse,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {

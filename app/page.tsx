@@ -39,6 +39,17 @@ function HomeContent() {
   }
   const showAIOverview = !(aiParam === '0' || aiParam === 'false');
 
+  // 保持跳转到 AI 页面时携带 RID，避免被中间件拦截
+  let ridParam: string | null = null;
+  for (const [key, value] of searchParams.entries()) {
+    if (key.toLowerCase() === 'rid') {
+      ridParam = value;
+      break;
+    }
+  }
+  const aiModeHref = ridParam ? `/ai?rid=${encodeURIComponent(ridParam)}` : '/ai';
+  const homeHref = ridParam ? `/?rid=${encodeURIComponent(ridParam)}` : '/';
+
   const handleSearch = useCallback(async (query: string, page: number = 1) => {
     setIsLoading(true);
     setError(null);
@@ -68,7 +79,8 @@ function HomeContent() {
       });
 
       // 保存搜索历史（异步，不阻塞UI）- 只在第一页保存
-      if (searchResults.length > 0 && page === 1) {
+      // 即使没有结果也保留 query 轨迹，避免漏报
+      if (page === 1) {
         const mode = showAIOverview ? 'search_with_overview' : 'search';
         saveSearchHistory(query, mode, searchResults)
           .then(historyId => {
@@ -123,7 +135,7 @@ function HomeContent() {
             /* Google 搜索结果页面布局：Logo 和 SearchBar 在同一行 */
             <div className="flex items-center gap-8 mb-4" style={{ maxWidth: '1140px' }}>
               {/* Logo - 左侧 */}
-              <Link href="/" className="flex-shrink-0">
+              <Link href={homeHref} className="flex-shrink-0">
                 <h1 className="text-2xl" style={{ 
                   fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
                   fontWeight: 400,
@@ -166,7 +178,7 @@ function HomeContent() {
                   <span style={{ color: '#fbbc04' }}>h</span>
                 </h1>
                 <Link
-                  href="/ai"
+                  href={aiModeHref}
                   className="px-4 py-2 text-sm font-medium rounded transition-colors"
                   style={{
                     backgroundColor: 'var(--google-blue)',
@@ -198,17 +210,21 @@ function HomeContent() {
               query={currentQuery} 
               results={results}
               historyId={aiHistoryId}
-              onAIResponseComplete={(aiResponse) => {
+              onAIResponseComplete={(aiResponse, overviewResults) => {
+                const resultsForOverview = overviewResults && overviewResults.length > 0
+                  ? overviewResults
+                  : results;
+
                 // 当 AI 回答完成时，优先更新首次搜索记录，避免重复写入
                 if (aiHistoryId) {
-                  updateAIResponse(aiHistoryId, aiResponse).catch(err => {
+                  updateAIResponse(aiHistoryId, aiResponse, resultsForOverview).catch(err => {
                     console.error('Failed to update AI response:', err);
                   });
                   return;
                 }
 
                 // 极端情况下首条记录未创建成功，回退为新建一条完整记录
-                saveSearchHistory(currentQuery, 'search_with_overview', results, aiResponse)
+                saveSearchHistory(currentQuery, 'search_with_overview', resultsForOverview, aiResponse)
                   .then(id => {
                     if (id) setAiHistoryId(id);
                   })
