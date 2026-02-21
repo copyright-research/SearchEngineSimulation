@@ -1,17 +1,21 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
 import { RRWebRecorder } from '@/components/RRWebRecorder';
 import type { SearchResult } from '@/types/search';
 import { useSearchHistory } from '@/lib/use-search-history';
+import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 export default function AIModePage() {
+  const searchParams = useSearchParams();
+
   // 为每条消息存储对应的 sources（使用消息 ID 作为 key）
   const [messageSourcesMap, setMessageSourcesMap] = useState<Record<string, SearchResult[]>>({});
   // 为每条消息存储对应的 historyId（使用消息 ID 作为 key）
@@ -29,6 +33,9 @@ export default function AIModePage() {
   
   // 搜索历史保存和反馈
   const { saveSearchHistory, reportFeedback } = useSearchHistory();
+
+  const ridParam = useMemo(() => getParamCaseInsensitive(searchParams, 'rid'), [searchParams]);
+  const searchPageHref = ridParam ? `/?rid=${encodeURIComponent(ridParam)}` : '/';
 
   // 确保 URL 中有 RID
   useEffect(() => {
@@ -286,7 +293,7 @@ export default function AIModePage() {
             /* 对话模式：Logo 和返回按钮在同一行 */
             <div className="flex items-center gap-8 mb-4" style={{ maxWidth: '1140px' }}>
               {/* Logo - 左侧 */}
-              <Link href="/" className="flex-shrink-0">
+              <Link href={searchPageHref} className="flex-shrink-0">
                 <h1 className="text-2xl" style={{ 
                   fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
                   fontWeight: 400,
@@ -307,7 +314,7 @@ export default function AIModePage() {
               
               {/* 返回搜索按钮 */}
               <Link 
-                href="/"
+                href={searchPageHref}
                 className="text-sm transition-colors"
                 style={{ 
                   color: 'var(--google-blue)',

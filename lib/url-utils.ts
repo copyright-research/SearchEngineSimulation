@@ -1,11 +1,16 @@
+interface SearchParamsLike {
+  get: (name: string) => string | null;
+  entries: () => IterableIterator<[string, string]>;
+}
+
 /**
  * 大小写不敏感地获取 URL search 参数
- * @param searchParams URLSearchParams 实例
+ * @param searchParams URLSearchParams/ReadonlyURLSearchParams 实例
  * @param key 参数名（支持大小写不敏感）
  * @returns 参数值或 null
  */
 export function getParamCaseInsensitive(
-  searchParams: URLSearchParams,
+  searchParams: SearchParamsLike,
   key: string
 ): string | null {
   // 先尝试直接获取
@@ -35,4 +40,3 @@ export function getUrlParamCaseInsensitive(key: string): string | null {
   const searchParams = new URLSearchParams(window.location.search);
   return getParamCaseInsensitive(searchParams, key);
 }
-

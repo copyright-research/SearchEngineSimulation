@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVerificationQuestions, saveUserAnswer, getUserAnswerStats } from '@/lib/db';
+import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 /**
  * 获取验证问题
@@ -8,7 +9,7 @@ import { getVerificationQuestions, saveUserAnswer, getUserAnswerStats } from '@/
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const rid = searchParams.get('rid');
+    const rid = getParamCaseInsensitive(searchParams, 'rid');
 
     if (!rid) {
       return NextResponse.json(
@@ -90,4 +91,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 interface Question {
   id: number;
@@ -14,14 +15,14 @@ interface Question {
 }
 
 interface Stats {
-  total_answered: number;
-  correct_count: number;
-  accuracy_percentage: number;
+  total: number;
+  correct: number;
+  accuracy: number;
 }
 
 function VerifyContent() {
   const searchParams = useSearchParams();
-  const rid = searchParams.get('rid');
+  const rid = getParamCaseInsensitive(searchParams, 'rid');
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -211,21 +212,21 @@ function VerifyContent() {
         </header>
 
         {/* Stats Card */}
-        {stats && stats.total_answered > 0 && (
+        {stats && stats.total > 0 && (
           <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl border border-blue-200 shadow-lg p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Progress</h2>
             <div className="grid grid-cols-3 gap-4">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">{stats.total_answered}</div>
+                <div className="text-3xl font-bold text-blue-600">{stats.total}</div>
                 <div className="text-sm text-gray-600">Answered</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">{stats.correct_count}</div>
+                <div className="text-3xl font-bold text-green-600">{stats.correct}</div>
                 <div className="text-sm text-gray-600">Correct</div>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-purple-600">
-                  {Math.round(parseFloat(stats.accuracy_percentage.toString()))}%
+                  {Math.round(parseFloat(stats.accuracy.toString()))}%
                 </div>
                 <div className="text-sm text-gray-600">Accuracy</div>
               </div>
@@ -407,4 +408,3 @@ export default function VerifyPage() {
     </Suspense>
   );
 }
-
