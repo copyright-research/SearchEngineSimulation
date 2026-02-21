@@ -36,12 +36,26 @@ interface RecordingData {
   recordingId: string;
   timestamp: string;
   events: eventWithTime[];
+  sessionUrl: string | null;
   metadata?: {
     url: string;
     userAgent: string;
     screen: { width: number; height: number };
     viewport: { width: number; height: number };
   };
+}
+
+function extractSessionUrl(events: eventWithTime[]): string | null {
+  for (const event of events) {
+    const eventType = (event as Record<string, unknown>).type;
+    const data = (event as Record<string, unknown>).data as Record<string, unknown> | undefined;
+
+    if (eventType === 4 && typeof data?.href === 'string') {
+      return data.href;
+    }
+  }
+
+  return null;
 }
 
 export default function ReplayPage() {
@@ -121,6 +135,7 @@ export default function ReplayPage() {
         recordingId: recording.recordingId,
         timestamp: new Date().toISOString(),
         events: allEvents,
+        sessionUrl: extractSessionUrl(allEvents),
       };
 
       setRecordingData(data);
@@ -508,11 +523,33 @@ export default function ReplayPage() {
           )}
 
           {recordingData && (
-            <div className="flex-1 flex items-center justify-center">
-              <div
-                ref={playerContainerRef}
-                className="w-full h-full flex items-center justify-center"
-              />
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                  Session URL
+                </div>
+                {recordingData.sessionUrl ? (
+                  <a
+                    href={recordingData.sessionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+                  >
+                    {recordingData.sessionUrl}
+                  </a>
+                ) : (
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    URL not found in recording metadata
+                  </span>
+                )}
+              </div>
+
+              <div className="flex-1 flex items-center justify-center min-h-0">
+                <div
+                  ref={playerContainerRef}
+                  className="w-full h-full flex items-center justify-center"
+                />
+              </div>
             </div>
           )}
         </div>
