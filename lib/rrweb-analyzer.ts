@@ -99,6 +99,32 @@ interface HeatmapPoint {
   intensity: number;
 }
 
+interface CitationClick {
+  timestamp: number;
+  kind: 'inline_citation_button' | 'source_link' | 'show_more' | 'show_less';
+  citationNumbers: number[];
+  sourceNumber: number | null;
+  label: string;
+  element: {
+    tagName: string;
+    className: string;
+    id: string;
+    dataAttributes: Record<string, string>;
+    textContent: string;
+  };
+  position: { x: number; y: number };
+}
+
+interface SnapshotNodeLike {
+  id?: number;
+  type?: number;
+  tagName?: string;
+  textContent?: string;
+  attributes?: Record<string, string>;
+  childNodes?: SnapshotNodeLike[];
+  parentId?: number;
+}
+
 interface AnalysisResult {
   // 基础统计
   totalEvents: number;
@@ -135,6 +161,7 @@ interface AnalysisResult {
   idleTime?: number;
   enterKeyPresses?: Array<{ timestamp: number; afterInput: boolean }>;
   userJourney?: UserJourney;
+  citationClicks?: CitationClick[];
 }
 
 export class RRWebAnalyzer {
@@ -165,6 +192,7 @@ export class RRWebAnalyzer {
       idleTime: this.calculateIdleTime(),
       enterKeyPresses: this.getEnterKeyPresses(),
       userJourney: this.analyzeUserJourney(),
+      citationClicks: this.getCitationClicks(),
     };
   }
 
@@ -699,6 +727,9 @@ ${analysis.scrollSequence && analysis.scrollSequence.length > 0
 
 🗺️ 用户旅程分析
 ${this.formatUserJourney(analysis.userJourney)}
+
+📚 Citation 点击分析
+${this.formatCitationClicks(analysis.citationClicks)}
 `;
 
     return basicReport + additionalSections;
@@ -874,6 +905,28 @@ ${this.generateRecommendations(analysis)}
     }
 
     return recommendations.join('\n');
+  }
+
+  private formatCitationClicks(citationClicks: CitationClick[] | undefined): string {
+    if (!citationClicks || citationClicks.length === 0) {
+      return '- 未检测到 citation 相关点击';
+    }
+
+    return citationClicks
+      .slice(-20)
+      .map((click, idx) => {
+        const time = new Date(click.timestamp).toLocaleTimeString();
+        const suffix = [
+          click.citationNumbers.length > 0
+            ? `citations=[${click.citationNumbers.join(', ')}]`
+            : '',
+          click.sourceNumber !== null ? `source=${click.sourceNumber}` : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        return `  ${idx + 1}. ${time} - ${click.kind} - ${click.label}${suffix ? ` (${suffix})` : ''}`;
+      })
+      .join('\n');
   }
 
   /**
@@ -1185,6 +1238,280 @@ ${this.generateRecommendations(analysis)}
       return parseInt(match[1], 10);
     }
     return null;
+  }
+
+  private getCitationClicks(): CitationClick[] {
+    const citationClicks: CitationClick[] = [];
+    const nodeMap = new Map<number, SnapshotNodeLike>();
+
+    this.events.forEach((event) => {
+      const eventType = (event as Record<string, unknown>).type;
+      const data = (event as Record<string, unknown>).data as Record<string, unknown> | undefined;
+
+      if (eventType === 2) {
+        nodeMap.clear();
+        const root = (data?.node as SnapshotNodeLike | undefined) || (data as SnapshotNodeLike | undefined);
+        if (root) {
+          this.indexSnapshotNode(root, nodeMap, undefined);
+        }
+      }
+
+      if (eventType === 3 && data?.source === 0) {
+        this.applyMutationsToNodeMap(data, nodeMap);
+      }
+
+      if (!(eventType === 3 && data?.source === 2 && data.type === 2)) {
+        return;
+      }
+
+      const targetId = typeof data.id === 'number' ? data.id : 0;
+      if (!targetId) return;
+
+      const resolvedTargetId = this.findNearestActionableNodeId(targetId, nodeMap) || targetId;
+      const resolvedNode = nodeMap.get(resolvedTargetId);
+      if (!resolvedNode || resolvedNode.type !== 2) {
+        return;
+      }
+
+      const attributes = resolvedNode.attributes || {};
+      const tagName = (resolvedNode.tagName || '').toLowerCase();
+      const className = attributes.class || '';
+      const textContent = this.extractTextFromNodeMap(resolvedTargetId, nodeMap).trim();
+      const ariaLabel = attributes['aria-label'] || '';
+      const title = attributes.title || '';
+      const dataSourceNumber = this.toNullableInt(attributes['data-source-number']);
+      const citationNumbers = this.extractCitationNumbers(
+        attributes['data-citation-numbers'] || ariaLabel || title || textContent
+      );
+
+      const isCitationButton =
+        tagName === 'button' &&
+        /citation/i.test(ariaLabel || title) &&
+        citationNumbers.length > 0;
+
+      const isShowMoreButton =
+        tagName === 'button' &&
+        /\bshow\s+more\b/i.test(textContent);
+
+      const isShowLessButton =
+        tagName === 'button' &&
+        /\bshow\s+less\b/i.test(textContent);
+
+      const isCitationSourceLink =
+        tagName === 'a' &&
+        dataSourceNumber !== null;
+
+      if (!isCitationButton && !isShowMoreButton && !isShowLessButton && !isCitationSourceLink) {
+        return;
+      }
+
+      const kind: CitationClick['kind'] = isCitationButton
+        ? 'inline_citation_button'
+        : isShowMoreButton
+          ? 'show_more'
+          : isShowLessButton
+            ? 'show_less'
+            : 'source_link';
+
+      const label = isCitationButton
+        ? ariaLabel || title || 'Citation button'
+        : isCitationSourceLink
+          ? textContent || attributes.href || 'Citation source link'
+          : textContent || (isShowMoreButton ? 'Show more' : 'Show less');
+
+      citationClicks.push({
+        timestamp: event.timestamp,
+        kind,
+        citationNumbers,
+        sourceNumber: dataSourceNumber,
+        label,
+        element: {
+          tagName,
+          className,
+          id: attributes.id || '',
+          dataAttributes: this.extractDataAttributes(attributes),
+          textContent,
+        },
+        position: {
+          x: typeof data.x === 'number' ? data.x : 0,
+          y: typeof data.y === 'number' ? data.y : 0,
+        },
+      });
+    });
+
+    return citationClicks;
+  }
+
+  private indexSnapshotNode(
+    node: SnapshotNodeLike,
+    nodeMap: Map<number, SnapshotNodeLike>,
+    parentId: number | undefined
+  ): void {
+    const copy: SnapshotNodeLike = {
+      ...node,
+      parentId,
+      attributes: node.attributes ? { ...node.attributes } : {},
+      childNodes: Array.isArray(node.childNodes) ? node.childNodes : [],
+    };
+
+    if (typeof node.id === 'number') {
+      nodeMap.set(node.id, copy);
+    }
+
+    const children = Array.isArray(node.childNodes) ? node.childNodes : [];
+    children.forEach((child) => {
+      this.indexSnapshotNode(child, nodeMap, typeof node.id === 'number' ? node.id : parentId);
+    });
+  }
+
+  private applyMutationsToNodeMap(
+    mutationData: Record<string, unknown>,
+    nodeMap: Map<number, SnapshotNodeLike>
+  ): void {
+    const removes = (mutationData.removes as Array<Record<string, unknown>> | undefined) || [];
+    removes.forEach((remove) => {
+      const id = typeof remove.id === 'number' ? remove.id : null;
+      if (id !== null) {
+        this.removeNodeFromMap(id, nodeMap);
+      }
+    });
+
+    const adds = (mutationData.adds as Array<Record<string, unknown>> | undefined) || [];
+    adds.forEach((add) => {
+      const node = add.node as SnapshotNodeLike | undefined;
+      const parentId = typeof add.parentId === 'number' ? add.parentId : undefined;
+      if (node) {
+        this.indexSnapshotNode(node, nodeMap, parentId);
+      }
+    });
+
+    const attributes = (mutationData.attributes as Array<Record<string, unknown>> | undefined) || [];
+    attributes.forEach((attr) => {
+      const id = typeof attr.id === 'number' ? attr.id : null;
+      if (id === null) return;
+      const target = nodeMap.get(id);
+      if (!target) return;
+      const incoming = (attr.attributes as Record<string, string> | undefined) || {};
+      target.attributes = {
+        ...(target.attributes || {}),
+        ...incoming,
+      };
+      nodeMap.set(id, target);
+    });
+
+    const texts = (mutationData.texts as Array<Record<string, unknown>> | undefined) || [];
+    texts.forEach((textChange) => {
+      const id = typeof textChange.id === 'number' ? textChange.id : null;
+      if (id === null) return;
+      const target = nodeMap.get(id);
+      if (!target) return;
+      target.textContent =
+        (typeof textChange.value === 'string' ? textChange.value : undefined) ||
+        (typeof textChange.text === 'string' ? textChange.text : undefined) ||
+        target.textContent;
+      nodeMap.set(id, target);
+    });
+  }
+
+  private removeNodeFromMap(id: number, nodeMap: Map<number, SnapshotNodeLike>): void {
+    const toDelete = new Set<number>([id]);
+    let found = true;
+
+    while (found) {
+      found = false;
+      nodeMap.forEach((node, nodeId) => {
+        if (
+          typeof node.parentId === 'number' &&
+          toDelete.has(node.parentId) &&
+          !toDelete.has(nodeId)
+        ) {
+          toDelete.add(nodeId);
+          found = true;
+        }
+      });
+    }
+
+    toDelete.forEach((nodeId) => nodeMap.delete(nodeId));
+  }
+
+  private findNearestActionableNodeId(
+    startId: number,
+    nodeMap: Map<number, SnapshotNodeLike>
+  ): number | null {
+    let currentId: number | undefined = startId;
+    let depth = 0;
+
+    while (typeof currentId === 'number' && depth < 12) {
+      const node = nodeMap.get(currentId);
+      if (!node) break;
+      const tagName = (node.tagName || '').toLowerCase();
+      const attrs = node.attributes || {};
+      if (tagName === 'button' || tagName === 'a' || 'data-source-number' in attrs) {
+        return currentId;
+      }
+      currentId = node.parentId;
+      depth += 1;
+    }
+
+    return null;
+  }
+
+  private extractTextFromNodeMap(
+    nodeId: number,
+    nodeMap: Map<number, SnapshotNodeLike>
+  ): string {
+    const root = nodeMap.get(nodeId);
+    if (!root) return '';
+
+    const parts: string[] = [];
+    const walk = (node: SnapshotNodeLike) => {
+      if (node.type === 3 && typeof node.textContent === 'string') {
+        parts.push(node.textContent);
+      }
+      if (node.type === 2 && typeof node.textContent === 'string') {
+        parts.push(node.textContent);
+      }
+      const children = Array.isArray(node.childNodes) ? node.childNodes : [];
+      children.forEach((child) => {
+        if (typeof child.id === 'number' && nodeMap.has(child.id)) {
+          const mapped = nodeMap.get(child.id);
+          if (mapped) walk(mapped);
+          return;
+        }
+        walk(child);
+      });
+    };
+
+    walk(root);
+    return parts.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private extractDataAttributes(attributes: Record<string, string>): Record<string, string> {
+    return Object.entries(attributes).reduce<Record<string, string>>((acc, [key, value]) => {
+      if (key.startsWith('data-')) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+  }
+
+  private extractCitationNumbers(text: string): number[] {
+    if (!text) return [];
+    const matches = text.match(/\d+/g);
+    if (!matches) return [];
+    return Array.from(
+      new Set(
+        matches
+          .map((raw) => parseInt(raw, 10))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      )
+    );
+  }
+
+  private toNullableInt(value: string | undefined): number | null {
+    if (!value) return null;
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   exportAnalysis(analysis: AnalysisResult): string {
