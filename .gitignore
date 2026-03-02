@@ -49,3 +49,4 @@ next-env.d.ts
 /data/*.db-shm
 /data/*.db-wal
 /lib/generated/prisma
+exports

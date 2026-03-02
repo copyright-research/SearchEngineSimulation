@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RRWebAnalyzer } from '@/lib/rrweb-analyzer';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
+import { strToU8, zipSync } from 'fflate';
 
 // 注册 AG Grid 模块
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -45,6 +46,75 @@ interface RecordingData {
   };
 }
 
+interface ExportBundleTable {
+  table: string;
+  file: string;
+  filter: {
+    rid?: string;
+    sessionId?: number | null;
+  };
+  rowCount: number;
+  rows: unknown[];
+}
+
+interface ExportRidBundleResponse {
+  rid: string;
+  startedAt: string;
+  finishedAt: string;
+  generatedBy: string;
+  sql: {
+    sessionId: number | null;
+    missingSession: boolean;
+    tables: ExportBundleTable[];
+  };
+  r2: {
+    prefix: string;
+    listedBytes: number;
+    matchedObjects: number;
+    objects: Array<{
+      key: string;
+      size: number;
+      uploadedAt: string | null;
+    }>;
+  };
+}
+
+function sanitizeFileSegment(input: string): string {
+  return input.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'rid';
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+  onProgress?: (done: number, total: number) => void
+): Promise<R[]> {
+  if (items.length === 0) return [];
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  let done = 0;
+
+  const runWorker = async () => {
+    while (true) {
+      const current = nextIndex;
+      nextIndex += 1;
+
+      if (current >= items.length) {
+        return;
+      }
+
+      results[current] = await worker(items[current], current);
+      done += 1;
+      onProgress?.(done, items.length);
+    }
+  };
+
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results;
+}
+
 function extractSessionUrl(events: eventWithTime[]): string | null {
   for (const event of events) {
     const eventType = (event as Record<string, unknown>).type;
@@ -68,6 +138,7 @@ export default function ReplayPage() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisReport, setAnalysisReport] = useState<string>('');
   const [downloadingBundle, setDownloadingBundle] = useState(false);
+  const [bundleProgress, setBundleProgress] = useState('');
   const [leftWidth, setLeftWidth] = useState(30); // 左侧宽度百分比
   const [isResizing, setIsResizing] = useState(false);
   
@@ -251,23 +322,167 @@ export default function ReplayPage() {
     URL.revokeObjectURL(url);
   };
 
-  // 下载当前 RID 的完整数据包（SQL + R2）
-  const downloadRidBundle = () => {
+  // 在浏览器端并行拉取并打包当前 RID 的完整数据包（SQL + R2）
+  const downloadRidBundle = async () => {
     if (!selectedRecording || downloadingBundle) return;
 
-    const url = `/api/replay/export-rid?rid=${encodeURIComponent(selectedRecording.recordingId)}`;
+    const rid = selectedRecording.recordingId;
     setDownloadingBundle(true);
+    setBundleProgress('Loading manifest...');
+    setError(null);
 
     try {
+      const manifestRes = await fetch(`/api/replay/export-rid?rid=${encodeURIComponent(rid)}`, {
+        cache: 'no-store',
+      });
+
+      if (!manifestRes.ok) {
+        let details = '';
+        try {
+          const body = await manifestRes.json();
+          details = body?.details || body?.error || '';
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(details || `Failed to load export manifest (${manifestRes.status})`);
+      }
+
+      const bundle = (await manifestRes.json()) as ExportRidBundleResponse;
+      const totalObjects = bundle.r2.objects.length;
+      setBundleProgress(`Downloading events (0/${totalObjects})...`);
+
+      const files: Record<string, Uint8Array> = {};
+      for (const table of bundle.sql.tables) {
+        files[table.file] = strToU8(
+          JSON.stringify(
+            {
+              table: table.table,
+              rid: bundle.rid,
+              sessionId: bundle.sql.sessionId,
+              filter: table.filter,
+              rowCount: table.rowCount,
+              rows: table.rows,
+            },
+            null,
+            2
+          )
+        );
+      }
+
+      const downloaded = await mapWithConcurrency(
+        bundle.r2.objects,
+        8,
+        async (obj) => {
+          const fileRes = await fetch(`/api/rrweb/download?path=${encodeURIComponent(obj.key)}`, {
+            cache: 'no-store',
+          });
+          if (!fileRes.ok) {
+            throw new Error(`Failed to download ${obj.key} (${fileRes.status})`);
+          }
+          return {
+            key: obj.key,
+            body: new Uint8Array(await fileRes.arrayBuffer()),
+          };
+        },
+        (done, total) => {
+          setBundleProgress(`Downloading events (${done}/${total})...`);
+        }
+      );
+
+      let totalBytesDownloaded = 0;
+      for (const item of downloaded) {
+        files[`r2/${item.key}`] = item.body;
+        totalBytesDownloaded += item.body.byteLength;
+      }
+
+      const tableSummaries = bundle.sql.tables.map((table) => ({
+        table: table.table,
+        rowCount: table.rowCount,
+        file: table.file,
+        filter: table.filter,
+      }));
+      const totalSqlRows = tableSummaries.reduce((sum, table) => sum + table.rowCount, 0);
+
+      files['r2/index.json'] = strToU8(
+        JSON.stringify(
+          {
+            rid: bundle.rid,
+            prefix: bundle.r2.prefix,
+            scannedObjects: bundle.r2.matchedObjects,
+            matchedObjects: bundle.r2.matchedObjects,
+            totalBytesDownloaded,
+            objects: bundle.r2.objects,
+          },
+          null,
+          2
+        )
+      );
+
+      files['manifest.json'] = strToU8(
+        JSON.stringify(
+          {
+            rid: bundle.rid,
+            startedAt: bundle.startedAt,
+            finishedAt: new Date().toISOString(),
+            outputDir: `browser-download/rid-${bundle.rid}`,
+            sql: {
+              rid: bundle.rid,
+              sessionId: bundle.sql.sessionId,
+              missingSession: bundle.sql.missingSession,
+              tableSummaries,
+              totalRows: totalSqlRows,
+            },
+            r2: {
+              rid: bundle.rid,
+              prefix: bundle.r2.prefix,
+              scannedObjects: bundle.r2.matchedObjects,
+              matchedObjects: bundle.r2.matchedObjects,
+              totalBytesDownloaded,
+              indexFile: 'r2/index.json',
+            },
+            source: {
+              generatedBy: bundle.generatedBy,
+              mode: 'browser',
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      files['README.txt'] = strToU8(
+        [
+          `Bundle RID: ${bundle.rid}`,
+          `Generated At: ${new Date().toISOString()}`,
+          '',
+          `SQL rows exported: ${totalSqlRows}`,
+          `SQL tables exported: ${tableSummaries.length}`,
+          `R2 objects matched: ${bundle.r2.matchedObjects}`,
+          `R2 bytes downloaded: ${totalBytesDownloaded}`,
+          '',
+          'See manifest.json for full details.',
+        ].join('\n')
+      );
+
+      setBundleProgress('Compressing zip...');
+      const zipData = zipSync(files, { level: 6 });
+      const zipBytes = new Uint8Array(zipData.byteLength);
+      zipBytes.set(zipData);
+      const blob = new Blob([zipBytes], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
+      a.download = `rid-${sanitizeFileSegment(bundle.rid)}-bundle-${Date.now()}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[replay] RID bundle download failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to download RID bundle');
     } finally {
-      window.setTimeout(() => {
-        setDownloadingBundle(false);
-      }, 800);
+      setDownloadingBundle(false);
+      setBundleProgress('');
     }
   };
 
@@ -437,7 +652,7 @@ export default function ReplayPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-5l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    {downloadingBundle ? 'Preparing...' : 'Download RID Bundle'}
+                    {downloadingBundle ? (bundleProgress || 'Preparing...') : 'Download RID Bundle'}
                   </button>
                 </>
               )}
