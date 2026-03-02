@@ -9,6 +9,7 @@ import type { eventWithTime } from '@rrweb/types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RRWebAnalyzer } from '@/lib/rrweb-analyzer';
+import { analyzeSearchABMetrics, type SearchABMetrics } from '@/lib/rrweb-search-ab-metrics';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { strToU8, zipSync } from 'fflate';
 
@@ -79,6 +80,13 @@ interface ExportRidBundleResponse {
   };
 }
 
+function formatDuration(ms: number): string {
+  const sec = Math.max(0, Math.round(ms / 1000));
+  const min = Math.floor(sec / 60);
+  const remSec = sec % 60;
+  return `${min}m ${remSec}s`;
+}
+
 function sanitizeFileSegment(input: string): string {
   return input.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'rid';
 }
@@ -137,6 +145,7 @@ export default function ReplayPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analysisReport, setAnalysisReport] = useState<string>('');
+  const [searchABMetrics, setSearchABMetrics] = useState<SearchABMetrics | null>(null);
   const [downloadingBundle, setDownloadingBundle] = useState(false);
   const [bundleProgress, setBundleProgress] = useState('');
   const [leftWidth, setLeftWidth] = useState(30); // 左侧宽度百分比
@@ -176,6 +185,7 @@ export default function ReplayPage() {
     setError(null);
     setSelectedRecording(recording);
     setRecordingData(null);
+    setSearchABMetrics(null);
 
     try {
       const response = await fetch(
@@ -211,6 +221,12 @@ export default function ReplayPage() {
       };
 
       setRecordingData(data);
+      try {
+        setSearchABMetrics(analyzeSearchABMetrics(allEvents));
+      } catch (metricsErr) {
+        console.error('[rrweb] Metrics parse error:', metricsErr);
+        setSearchABMetrics(null);
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load recording');
@@ -301,9 +317,21 @@ export default function ReplayPage() {
 
     const analyzer = new RRWebAnalyzer(recordingData.events);
     const analysis = analyzer.analyzeComplete(); // 使用完整分析
-    const report = analyzer.generateCompleteReport(analysis); // 生成完整报告
+    const metrics = searchABMetrics ?? analyzeSearchABMetrics(recordingData.events);
+    const report = `${analyzer.generateCompleteReport(analysis)}
+
+=== Search AB Metrics (rrweb-parsed) ===
+- Session duration: ${formatDuration(metrics.sessionDurationMs)}
+- Pages visited: ${metrics.pagesVisited.length}
+- Queries: ${metrics.totals.queryCount}
+- Result clicks: ${metrics.totals.resultClickCount} (organic=${metrics.totals.organicClickCount}, ai_source=${metrics.totals.aiSourceClickCount})
+- News-domain clicks: ${metrics.totals.newsDomainClickCount}
+- AI interactions: ${metrics.totals.aiInteractionCount} (show_all=${metrics.totals.showAllClickCount}, show_more=${metrics.totals.showMoreClickCount}, show_less=${metrics.totals.showLessClickCount})
+- Scroll: page_max_y=${metrics.scroll.maxPageScrollY}, ai_area_max_y=${metrics.scroll.aiAreaMaxScrollY}
+`; // 生成完整报告 + 结构化指标摘要
     
     setAnalysisReport(report);
+    setSearchABMetrics(metrics);
     setShowAnalysis(true);
   };
 
@@ -316,6 +344,27 @@ export default function ReplayPage() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `rrweb-analysis-${selectedRecording?.recordingId}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadMetricsJson = () => {
+    if (!searchABMetrics || !selectedRecording) return;
+
+    const payload = {
+      recordingId: selectedRecording.recordingId,
+      sessionId: selectedRecording.sessionId,
+      generatedAt: new Date().toISOString(),
+      metrics: searchABMetrics,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rrweb-search-metrics-${selectedRecording.recordingId}-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -645,6 +694,16 @@ export default function ReplayPage() {
                     Analyze
                   </button>
                   <button
+                    onClick={downloadMetricsJson}
+                    disabled={!searchABMetrics}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8m-8-4h8m-8-4h8m3 12a2 2 0 01-2 2H7a2 2 0 01-2-2V4a2 2 0 012-2h7l5 5v13z" />
+                    </svg>
+                    Metrics JSON
+                  </button>
+                  <button
                     onClick={downloadRidBundle}
                     disabled={downloadingBundle}
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white rounded-lg transition-colors flex items-center gap-2"
@@ -790,6 +849,64 @@ export default function ReplayPage() {
                 )}
               </div>
 
+              {searchABMetrics && (
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                  <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                    rrweb Parsed Search Metrics
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">Session</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {formatDuration(searchABMetrics.sessionDurationMs)}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">Queries</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.totals.queryCount}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">Result Clicks</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.totals.resultClickCount}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">AI Interactions</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.totals.aiInteractionCount}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">Organic / AI Source</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.totals.organicClickCount} / {searchABMetrics.totals.aiSourceClickCount}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">News Domain Clicks</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.totals.newsDomainClickCount}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">Show All / More / Less</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.totals.showAllClickCount} / {searchABMetrics.totals.showMoreClickCount} / {searchABMetrics.totals.showLessClickCount}
+                      </div>
+                    </div>
+                    <div className="rounded border border-gray-200 dark:border-gray-700 px-2 py-2 bg-white dark:bg-gray-800">
+                      <div className="text-gray-500 dark:text-gray-400">AI Scroll MaxY</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">
+                        {searchABMetrics.scroll.aiAreaMaxScrollY}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex-1 flex items-center justify-center min-h-0">
                 <div
                   ref={playerContainerRef}
@@ -827,6 +944,86 @@ export default function ReplayPage() {
               </div>
             </div>
             <div className="p-6 overflow-auto flex-1">
+              {searchABMetrics && (
+                <div className="mb-4 rounded border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                    Structured Metrics (Parsed from rrweb JSON)
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mb-3">
+                    Participant RID: {searchABMetrics.inferredParticipantId || 'N/A'} | Pages: {searchABMetrics.pagesVisited.length} | Visibility Changes: {searchABMetrics.visibilityChanges.length}
+                  </div>
+                  {searchABMetrics.queries.length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1">Queries</div>
+                      <div className="overflow-auto">
+                        <table className="min-w-full text-xs border border-gray-200 dark:border-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="text-left px-2 py-1">Query</th>
+                              <th className="text-left px-2 py-1">Surface</th>
+                              <th className="text-left px-2 py-1">Treatment</th>
+                              <th className="text-left px-2 py-1">Duration</th>
+                              <th className="text-left px-2 py-1">Organic</th>
+                              <th className="text-left px-2 py-1">AI Source</th>
+                              <th className="text-left px-2 py-1">Show All/More/Less</th>
+                              <th className="text-left px-2 py-1">AI Scroll MaxY</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {searchABMetrics.queries.map((q) => (
+                              <tr key={q.queryId} className="border-t border-gray-200 dark:border-gray-700">
+                                <td className="px-2 py-1">{q.query}</td>
+                                <td className="px-2 py-1">{q.surface}</td>
+                                <td className="px-2 py-1">{q.treatmentGroup}</td>
+                                <td className="px-2 py-1">{formatDuration(q.searchDurationMs)}</td>
+                                <td className="px-2 py-1">{q.organicClicks}</td>
+                                <td className="px-2 py-1">{q.aiSourceClicks}</td>
+                                <td className="px-2 py-1">{q.showAllClicks}/{q.showMoreClicks}/{q.showLessClicks}</td>
+                                <td className="px-2 py-1">{q.aiAreaMaxScrollY}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  {searchABMetrics.resultClicks.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1">Result Clicks (Top 20)</div>
+                      <div className="overflow-auto">
+                        <table className="min-w-full text-xs border border-gray-200 dark:border-gray-700">
+                          <thead className="bg-gray-50 dark:bg-gray-800">
+                            <tr>
+                              <th className="text-left px-2 py-1">#</th>
+                              <th className="text-left px-2 py-1">Query</th>
+                              <th className="text-left px-2 py-1">Source</th>
+                              <th className="text-left px-2 py-1">Organic Rank</th>
+                              <th className="text-left px-2 py-1">AI Rank</th>
+                              <th className="text-left px-2 py-1">Domain</th>
+                              <th className="text-left px-2 py-1">News</th>
+                              <th className="text-left px-2 py-1">Title</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {searchABMetrics.resultClicks.slice(0, 20).map((click) => (
+                              <tr key={`${click.timestamp}-${click.clickOrder}-${click.url}`} className="border-t border-gray-200 dark:border-gray-700">
+                                <td className="px-2 py-1">{click.clickOrder}</td>
+                                <td className="px-2 py-1">{click.query || '-'}</td>
+                                <td className="px-2 py-1">{click.source}</td>
+                                <td className="px-2 py-1">{click.organicRank ?? '-'}</td>
+                                <td className="px-2 py-1">{click.aiCitationRank ?? '-'}</td>
+                                <td className="px-2 py-1">{click.domain || '-'}</td>
+                                <td className="px-2 py-1">{click.isNewsDomain ? 'Y' : 'N'}</td>
+                                <td className="px-2 py-1">{click.pageTitle}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <pre className="whitespace-pre-wrap text-sm font-mono text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900 p-4 rounded">
                 {analysisReport}
               </pre>
