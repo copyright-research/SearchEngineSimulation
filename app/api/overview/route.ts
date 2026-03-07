@@ -52,7 +52,13 @@ export async function POST(req: NextRequest) {
     console.log(`[Overview API ${requestId}] 📝 Query: "${query}", Results count: ${results?.length || 0}`);
 
     // 3. 先查缓存（命中则直接返回，不调用外部搜索/LLM）
-    const cachedOverview = await getCachedOverviewByQuery(query);
+    let cachedOverview: Awaited<ReturnType<typeof getCachedOverviewByQuery>> = null;
+    try {
+      cachedOverview = await getCachedOverviewByQuery(query);
+    } catch (cacheError) {
+      console.error(`[Overview API ${requestId}] ⚠️ Cache lookup failed, fallback to live generation:`, cacheError);
+    }
+
     if (cachedOverview) {
       console.log(`[Overview API ${requestId}] ♻️ Cache hit for query: "${query}"`);
 

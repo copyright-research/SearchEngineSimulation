@@ -7,15 +7,18 @@ import type { eventWithTime } from '@rrweb/types';
 interface UseRRWebRecorderOptions {
   enabled: boolean;
   recordingId?: string;
-  uploadInterval?: number; // 定时上传间隔（毫秒），默认 30 秒
-  debounceMs?: number; // 防抖延迟（毫秒），默认 2 秒
+  uploadInterval?: number; // 定时上传间隔（毫秒），默认 10 秒
+  debounceMs?: number; // 防抖延迟（毫秒），默认 1.5 秒
 }
+
+const MAX_PENDING_EVENTS_BEFORE_UPLOAD = 120;
+const MAX_BEACON_PAYLOAD_BYTES = 60 * 1024; // sendBeacon 常见上限约 64KB，预留缓冲
 
 export function useRRWebRecorder({ 
   enabled, 
   recordingId,
-  uploadInterval = 30000, // 30 秒
-  debounceMs = 3000, // 3 秒防抖
+  uploadInterval = 10000, // 10 秒
+  debounceMs = 1500, // 1.5 秒防抖
 }: UseRRWebRecorderOptions) {
   const [isRecording, setIsRecording] = useState(false);
   const [eventsCount, setEventsCount] = useState(0);
@@ -33,7 +36,7 @@ export function useRRWebRecorder({
   // 上传增量事件
   const uploadingRef = useRef(false); // 防止并发上传
   
-  const uploadChunk = useCallback(async (force = false) => {
+  const uploadChunk = useCallback(async (force = false, keepalive = false) => {
     if (!recordingId || !sessionIdRef.current) return;
     
     // 防止并发上传
@@ -76,6 +79,7 @@ export function useRRWebRecorder({
           events: newEvents,
           chunkIndex: chunkIndexRef.current,
         }),
+        keepalive,
       });
 
       if (!response.ok) {
@@ -100,6 +104,44 @@ export function useRRWebRecorder({
       uploadingRef.current = false; // 释放锁
     }
   }, [recordingId]);
+
+  // 在页面隐藏/卸载时使用 beacon 兜底上传最后一段，失败则回退 keepalive fetch
+  const flushWithBeacon = useCallback(() => {
+    if (!recordingId || !sessionIdRef.current) return;
+
+    const totalEvents = eventsRef.current.length;
+    const lastUploadedIndex = lastUploadedIndexRef.current;
+    if (totalEvents <= lastUploadedIndex) return;
+
+    const remainingEvents = eventsRef.current.slice(lastUploadedIndex);
+    const payload = JSON.stringify({
+      recordingId,
+      sessionId: sessionIdRef.current,
+      events: remainingEvents,
+      chunkIndex: chunkIndexRef.current,
+    });
+
+    const payloadBytes = new TextEncoder().encode(payload).byteLength;
+    let sent = false;
+
+    if (payloadBytes <= MAX_BEACON_PAYLOAD_BYTES && typeof navigator.sendBeacon === 'function') {
+      sent = navigator.sendBeacon(
+        '/api/rrweb/upload',
+        new Blob([payload], { type: 'application/json' })
+      );
+    }
+
+    if (sent) {
+      lastUploadedIndexRef.current = totalEvents;
+      chunkIndexRef.current += 1;
+      setUploadedCount(totalEvents);
+      setUploadStatus('success');
+      return;
+    }
+
+    // beacon 失败时回退 keepalive fetch
+    void uploadChunk(true, true);
+  }, [recordingId, uploadChunk]);
 
   // 防抖上传：每次有新事件时触发，但会等待一段时间没有新事件后才真正上传
   const debouncedUpload = useCallback(() => {
@@ -162,7 +204,14 @@ export function useRRWebRecorder({
           setEventsCount(eventsRef.current.length);
         }
 
-        // 每次有新事件时触发防抖上传
+        const pendingEvents = eventsRef.current.length - lastUploadedIndexRef.current;
+        // 队列过大时立即上传，降低最后一段丢失概率
+        if (pendingEvents >= MAX_PENDING_EVENTS_BEFORE_UPLOAD) {
+          void uploadChunk(false);
+          return;
+        }
+
+        // 否则走防抖上传
         debouncedUpload();
       },
       checkoutEveryNms: 30 * 1000,
@@ -186,22 +235,20 @@ export function useRRWebRecorder({
 
     // 页面卸载前上传剩余事件
     const handleBeforeUnload = () => {
-      // 使用 sendBeacon 或 同步请求（beforeunload 时异步请求可能被取消）
-      const remainingEvents = eventsRef.current.slice(lastUploadedIndexRef.current);
-      if (remainingEvents.length > 0) {
-        // 使用 keepalive 确保请求完成
-        navigator.sendBeacon(
-          '/api/rrweb/upload',
-          new Blob([JSON.stringify({
-            recordingId,
-            sessionId: sessionIdRef.current,
-            events: remainingEvents,
-            chunkIndex: chunkIndexRef.current,
-          })], { type: 'application/json' })
-        );
+      flushWithBeacon();
+    };
+    const handlePageHide = () => {
+      flushWithBeacon();
+    };
+    const handleVisibilityHidden = () => {
+      if (document.hidden) {
+        // 标签页切后台时也主动 flush，避免长期堆积
+        void uploadChunk(true, true);
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', handleVisibilityHidden);
 
     return () => {
       console.log('[rrweb] Stopping recording');
@@ -226,16 +273,18 @@ export function useRRWebRecorder({
 
       // 移除事件监听
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityHidden);
 
       // 上传最后的事件（只在正常停止时，不在页面卸载时）
       if (eventsRef.current.length > lastUploadedIndexRef.current) {
-        uploadChunk(true);
+        void uploadChunk(true, true);
       }
 
       setIsRecording(false);
     };
-  }, [enabled, recordingId, uploadInterval, uploadChunk, debouncedUpload]);
+  }, [enabled, recordingId, uploadInterval, uploadChunk, debouncedUpload, flushWithBeacon]);
 
   // 下载录制数据
   const downloadRecording = () => {

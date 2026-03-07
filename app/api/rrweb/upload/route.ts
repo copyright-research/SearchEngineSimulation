@@ -9,10 +9,41 @@ import { getParamCaseInsensitive } from '@/lib/url-utils';
  */
 export async function POST(request: NextRequest) {
   try {
-    const { recordingId, sessionId, events, chunkIndex } = await request.json();
+    let payload: unknown;
+    try {
+      payload = await request.json();
+    } catch {
+      const text = await request.text();
+      if (!text || !text.trim()) {
+        return NextResponse.json(
+          { error: 'Empty request body' },
+          { status: 400 }
+        );
+      }
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        return NextResponse.json(
+          { error: 'Invalid JSON body' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const parsed = (payload ?? {}) as Record<string, unknown>;
+    const recordingId = typeof parsed.recordingId === 'string' ? parsed.recordingId : '';
+    const sessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId : '';
+    const events = parsed.events;
+    const chunkIndexRaw = parsed.chunkIndex;
+    const chunkIndex =
+      typeof chunkIndexRaw === 'number'
+        ? chunkIndexRaw
+        : typeof chunkIndexRaw === 'string'
+          ? parseInt(chunkIndexRaw, 10)
+          : NaN;
 
     // 验证参数
-    if (!recordingId || !sessionId || !events || typeof chunkIndex !== 'number') {
+    if (!recordingId || !sessionId || !events || !Number.isFinite(chunkIndex)) {
       return NextResponse.json(
         { error: 'Missing required fields: recordingId, sessionId, events, chunkIndex' },
         { status: 400 }
@@ -20,11 +51,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 验证 events 是否为数组
-    if (!Array.isArray(events) || events.length === 0) {
+    if (!Array.isArray(events)) {
       return NextResponse.json(
-        { error: 'Events must be a non-empty array' },
+        { error: 'Events must be an array' },
         { status: 400 }
       );
+    }
+
+    // 空 chunk 直接成功返回，避免前端 flush 时被 400 干扰
+    if (events.length === 0) {
+      return NextResponse.json({
+        success: true,
+        chunkIndex,
+        eventsCount: 0,
+        skipped: 'empty_events',
+      });
     }
 
     // 构建 blob 路径：recordings/{RID}/{sessionId}/chunk-{index}.json
@@ -247,4 +288,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

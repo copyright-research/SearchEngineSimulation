@@ -44,7 +44,13 @@ export async function GET(request: NextRequest) {
 
     // 3. 先查缓存（命中则不调用外部 API，也不消耗限流配额）
     if (startIndex === 1) {
-      const cachedResults = await getCachedSearchResultsByQuery(query);
+      let cachedResults: Awaited<ReturnType<typeof getCachedSearchResultsByQuery>> = null;
+      try {
+        cachedResults = await getCachedSearchResultsByQuery(query);
+      } catch (cacheError) {
+        console.error('[Search API] Cache lookup failed, fallback to live search:', cacheError);
+      }
+
       if (cachedResults && cachedResults.length > 0) {
         const cachedResponse: GoogleSearchResponse = {
           kind: 'customsearch#search',
