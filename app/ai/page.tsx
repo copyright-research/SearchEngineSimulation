@@ -471,7 +471,7 @@ function AIModePageContent() {
             // 对话界面 - Google 风格，左对齐
             <div className="w-full flex-grow flex flex-col xl:ml-[182px]">
               {/* 消息列表 */}
-              <div className="space-y-8 mb-6 flex-shrink-0 w-full">
+              <div className="space-y-4 mb-6 flex-shrink-0 w-full">
                 {messages.map((message, index) => {
                   // Extract text content
                   const fullText = message.parts
@@ -500,18 +500,22 @@ function AIModePageContent() {
                       className={isStreaming ? '' : 'animate-fade-in'}
                       style={{ 
                         contain: 'layout style paint',
-                        paddingBottom: '20px',
-                        borderBottom: '1px solid var(--google-border)'
+                        paddingBottom: message.role === 'assistant' ? '20px' : '8px',
+                        borderBottom: message.role === 'assistant' ? '1px solid var(--google-border)' : 'none'
                       }}
                     >
                       {message.role === 'user' ? (
-                        // User message - Google style
-                        <div className="mb-4">
-                          <div className="text-xl" style={{ 
-                            color: 'var(--google-text)',
-                            fontFamily: 'Roboto, Arial, sans-serif',
-                            fontWeight: 400
-                          }}>
+                        // User message - chat bubble style
+                        <div className="mb-2 flex justify-end">
+                          <div
+                            className="max-w-[75%] whitespace-pre-wrap rounded-[20px] px-4 py-2.5 text-[15px] leading-6 shadow-sm"
+                            style={{
+                              backgroundColor: '#e8f0fe',
+                              color: 'var(--google-text)',
+                              fontFamily: 'Roboto, Arial, sans-serif',
+                              fontWeight: 400
+                            }}
+                          >
                             {mainContent}
                           </div>
                         </div>
