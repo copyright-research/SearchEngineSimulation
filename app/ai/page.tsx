@@ -506,7 +506,10 @@ function AIModePageContent() {
                     >
                       {message.role === 'user' ? (
                         // User message - chat bubble style
-                        <div className="mb-2 flex justify-end">
+                        <div
+                          className="mb-2 flex w-full justify-end"
+                          style={{ maxWidth: '1140px' }}
+                        >
                           <div
                             className="max-w-[75%] whitespace-pre-wrap rounded-[20px] px-4 py-2.5 text-[15px] leading-6 shadow-sm"
                             style={{
