@@ -18,6 +18,22 @@ export interface SearchResult {
   searchSource?: 'tavily' | 'google';
 }
 
+export interface TopStoryItem {
+  title: string;
+  link: string;
+  source: string;
+  date?: string;
+  thumbnail?: string;
+  isLive?: boolean;
+}
+
+export interface TopStoriesBlock {
+  title: string;
+  items: TopStoryItem[];
+  moreLink?: string;
+  source: 'serpapi_google' | 'serpapi_google_news';
+}
+
 export interface GoogleSearchResponse {
   kind: string;
   url: {

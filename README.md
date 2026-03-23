@@ -19,6 +19,7 @@ A modern, fast, and elegant search engine powered by Google Custom Search API, b
 - 📱 **Responsive**: Works perfectly on mobile and desktop
 - ⌨️ **Keyboard Shortcuts**: Press `/` to focus search
 - 🖼️ **Rich Results**: Displays thumbnails and favicons
+- 📰 **Top Stories Cards**: Optional SerpAPI-powered news clusters in AI mode
 - 🎯 **Type-safe**: Full TypeScript support
 
 ## 🚀 Quick Start
@@ -46,6 +47,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id_here
 GROQ_API_KEY=your_GROQ_api_key_here
 TAVILY_API_KEY=your_tavily_api_key_here  # Optional, for enhanced search
+SERPAPI_API_KEY=your_serpapi_key_here    # Optional, for AI mode Top stories cards
 USE_SQLITE=true  # Use SQLite for local development
 ```
 

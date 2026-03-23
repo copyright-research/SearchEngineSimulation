@@ -2,10 +2,11 @@ import { streamText, UIMessage, convertToModelMessages } from 'ai';
 import { NextRequest } from 'next/server';
 import { getChatModel } from '@/lib/ai-model';
 import { searchGoogle } from '@/lib/google-search';
+import { getTopStoriesBlock } from '@/lib/serpapi-news';
 import { hybridSearch } from '@/lib/tavily-search';
 import { rateLimit, getClientIp } from '@/lib/rate-limit';
 import { generateSearchQuery, needsContext } from '@/lib/query-rewriter';
-import type { SearchResult } from '@/types/search';
+import type { SearchResult, TopStoriesBlock } from '@/types/search';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -81,22 +82,37 @@ export async function POST(req: NextRequest) {
       searchQuery = await generateSearchQuery(query, historyMessages);
     }
 
-    // 5. 执行混合搜索（Google + Tavily）
-    let searchResults: SearchResult[] = [];
-    try {
-      searchResults = await hybridSearch(searchQuery, async (q) => {
-        const response = await searchGoogle(q);
-        return response.items || [];
-      }, { includeSource: debug });
-      console.log('Hybrid search completed:', { 
-        originalQuery: query,
-        searchQuery: searchQuery,
-        resultsCount: searchResults.length 
-      });
-    } catch (searchError) {
+    // 5. 并行执行搜索与 Top stories 拉取
+    const searchPromise = hybridSearch(searchQuery, async (q) => {
+      const response = await searchGoogle(q);
+      return response.items || [];
+    }, { includeSource: debug }).catch(searchError => {
       console.error('Search error:', searchError);
-      // 继续执行，但没有搜索结果
-    }
+      return [];
+    });
+
+    const topStoriesPromise = getTopStoriesBlock(searchQuery).catch(newsError => {
+      console.warn('[AI Chat] Top stories unavailable:', newsError);
+      return null;
+    });
+
+    let searchResults: SearchResult[] = [];
+    let topStories: TopStoriesBlock | null = null;
+
+    const [resolvedSearchResults, resolvedTopStories] = await Promise.all([
+      searchPromise,
+      topStoriesPromise,
+    ]);
+
+    searchResults = resolvedSearchResults;
+    topStories = resolvedTopStories;
+
+    console.log('Hybrid search completed:', { 
+      originalQuery: query,
+      searchQuery: searchQuery,
+      resultsCount: searchResults.length,
+      topStoriesCount: topStories?.items.length || 0,
+    });
 
     // 6. 构建 grounding context（当前搜索结果）
     const context = searchResults
@@ -226,11 +242,15 @@ Please provide a brief answer based on general knowledge and the conversation hi
     // 将搜索结果编码到响应头中（使用 UTF-8）
     const sourcesToSend = searchResults.slice(0, 10);
     const encodedSources = Buffer.from(JSON.stringify(sourcesToSend), 'utf-8').toString('base64');
+    const encodedTopStories = topStories
+      ? Buffer.from(JSON.stringify(topStories), 'utf-8').toString('base64')
+      : '';
     
     return result.toUIMessageStreamResponse({
       headers: {
         'X-Search-Results': encodedSources, // 搜索结果
         'X-Search-Results-Count': searchResults.length.toString(),
+        'X-Top-Stories': encodedTopStories,
         'X-Original-Query': Buffer.from(query, 'utf-8').toString('base64'),
         'X-Optimized-Query': searchQuery !== query ? Buffer.from(searchQuery, 'utf-8').toString('base64') : '',
         'X-RateLimit-Limit': '20',

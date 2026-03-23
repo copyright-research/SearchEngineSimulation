@@ -8,16 +8,42 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
+import TopStoriesCard from '@/components/TopStoriesCard';
 import { RRWebRecorder } from '@/components/RRWebRecorder';
-import type { SearchResult } from '@/types/search';
+import type { SearchResult, TopStoriesBlock } from '@/types/search';
 import { useSearchHistory } from '@/lib/use-search-history';
 import { getParamCaseInsensitive } from '@/lib/url-utils';
+
+function decodeBase64Utf8(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const binaryString = atob(value);
+  const bytes = new Uint8Array(binaryString.length);
+
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function parseBase64Json<T>(value: string | null): T | null {
+  const decoded = decodeBase64Utf8(value);
+  if (!decoded) {
+    return null;
+  }
+
+  return JSON.parse(decoded) as T;
+}
 
 function AIModePageContent() {
   const searchParams = useSearchParams();
 
   // 为每条消息存储对应的 sources（使用消息 ID 作为 key）
   const [messageSourcesMap, setMessageSourcesMap] = useState<Record<string, SearchResult[]>>({});
+  const [messageTopStoriesMap, setMessageTopStoriesMap] = useState<Record<string, TopStoriesBlock>>({});
   // 为每条消息存储对应的 historyId（使用消息 ID 作为 key）
   const [messageHistoryIdMap, setMessageHistoryIdMap] = useState<Record<string, number>>({});
   // 为每条消息存储反馈状态（使用消息 ID 作为 key）
@@ -91,28 +117,22 @@ function AIModePageContent() {
         // 从响应头中获取 sources
         let sources: SearchResult[] = [];
         if (latestResponseHeadersRef.current) {
-          const searchResultsHeader = latestResponseHeadersRef.current.get('X-Search-Results');
-          if (searchResultsHeader) {
-            try {
-              // 使用 TextDecoder 正确解码 UTF-8
-              const binaryString = atob(searchResultsHeader);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-              const decodedString = new TextDecoder('utf-8').decode(bytes);
-              sources = JSON.parse(decodedString);
-              
+          try {
+            sources = parseBase64Json<SearchResult[]>(
+              latestResponseHeadersRef.current.get('X-Search-Results')
+            ) || [];
+
+            if (sources.length > 0) {
               console.log('Loaded sources from response header:', {
                 messageId: message.id,
                 sourcesCount: sources.length
               });
-            } catch (decodeError) {
-              console.error('Failed to decode sources from header:', decodeError);
             }
+          } catch (decodeError) {
+            console.error('Failed to decode sources from header:', decodeError);
           }
         }
-        
+
         // 保存到 map 中
         if (sources.length > 0) {
           setMessageSourcesMap(prev => ({
@@ -120,22 +140,33 @@ function AIModePageContent() {
             [message.id]: sources
           }));
         }
+
+        if (latestResponseHeadersRef.current) {
+          try {
+            const topStories = parseBase64Json<TopStoriesBlock>(
+              latestResponseHeadersRef.current.get('X-Top-Stories')
+            );
+
+            if (topStories && Array.isArray(topStories.items) && topStories.items.length > 0) {
+              setMessageTopStoriesMap(prev => ({
+                ...prev,
+                [message.id]: topStories
+              }));
+            }
+          } catch (decodeError) {
+            console.error('Failed to decode top stories from header:', decodeError);
+          }
+        }
         
         // 获取对应的用户查询 - 优先从 Response Header 获取，因为 messages 状态在闭包中可能是旧的
         let userQuery = '';
         if (latestResponseHeadersRef.current) {
-          const originalQueryHeader = latestResponseHeadersRef.current.get('X-Original-Query');
-          if (originalQueryHeader) {
-            try {
-              const binaryString = atob(originalQueryHeader);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-              userQuery = new TextDecoder('utf-8').decode(bytes);
-            } catch (e) {
-              console.error('Failed to decode user query from header:', e);
-            }
+          try {
+            userQuery = decodeBase64Utf8(
+              latestResponseHeadersRef.current.get('X-Original-Query')
+            ) || '';
+          } catch (e) {
+            console.error('Failed to decode user query from header:', e);
           }
         }
 
@@ -490,6 +521,9 @@ function AIModePageContent() {
                   const messageSources = message.role === 'assistant' 
                     ? messageSourcesMap[message.id] || []
                     : [];
+                  const messageTopStories = message.role === 'assistant'
+                    ? messageTopStoriesMap[message.id]
+                    : undefined;
 
                   // Only use animation for completed messages
                   const isStreaming = status === 'streaming' && index === messages.length - 1;
@@ -524,9 +558,17 @@ function AIModePageContent() {
                         </div>
                       ) : (
                         // AI Answer - Google AI Overview style
-                        <div className="flex flex-col lg:flex-row gap-5 items-start">
-                          {/* AI Answer Content - Left Side */}
-                          <div style={{ flex: '0 0 612px', maxWidth: '612px' }}>
+                        <div className="w-full" style={{ maxWidth: '989px' }}>
+                          {messageTopStories && (
+                            <TopStoriesCard
+                              block={messageTopStories}
+                              className="mb-5"
+                            />
+                          )}
+
+                          <div className="flex flex-col lg:flex-row gap-5 items-start">
+                            {/* AI Answer Content - Left Side */}
+                            <div style={{ flex: '0 0 612px', maxWidth: '612px' }}>
                             {/* Header */}
                             <div 
                               className="flex items-center gap-3 mb-4"
@@ -670,27 +712,27 @@ function AIModePageContent() {
                                 </div>
                               )}
                             </div>
-                          </div>
+                            </div>
 
-                          {/* 该消息的 Sources - Google AI mode 风格 (.HWMcu) */}
-                          {messageSources.length > 0 && (
-                            <div 
-                              className="flex-shrink-0" 
-                              style={{ 
-                                width: '372px',
-                                maxHeight: '600px',
-                                position: 'sticky',
-                                top: '100px'
-                              }}
-                            >
+                            {/* 该消息的 Sources - Google AI mode 风格 (.HWMcu) */}
+                            {messageSources.length > 0 && (
                               <div 
-                                className="flex flex-col overflow-hidden"
-                                style={{
-                                  background: 'var(--nvzc36, #f7f8fa)',
-                                  borderRadius: '20px',
-                                  boxShadow: 'none'
+                                className="flex-shrink-0" 
+                                style={{ 
+                                  width: '372px',
+                                  maxHeight: '600px',
+                                  position: 'sticky',
+                                  top: '100px'
                                 }}
                               >
+                                <div 
+                                  className="flex flex-col overflow-hidden"
+                                  style={{
+                                    background: 'var(--nvzc36, #f7f8fa)',
+                                    borderRadius: '20px',
+                                    boxShadow: 'none'
+                                  }}
+                                >
                                 {/* Header (.S1iSq) */}
                                 <div style={{ padding: '16px 20px 8px' }}>
                                   <div 
@@ -953,9 +995,10 @@ function AIModePageContent() {
                                     });
                                   })()}
                                 </ul>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
