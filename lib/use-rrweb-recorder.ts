@@ -7,18 +7,18 @@ import type { eventWithTime } from '@rrweb/types';
 interface UseRRWebRecorderOptions {
   enabled: boolean;
   recordingId?: string;
-  uploadInterval?: number; // 定时上传间隔（毫秒），默认 10 秒
-  debounceMs?: number; // 防抖延迟（毫秒），默认 1.5 秒
+  uploadInterval?: number; // 定时上传间隔（毫秒），默认 3 秒
+  debounceMs?: number; // 防抖延迟（毫秒），默认 0.5 秒
 }
 
-const MAX_PENDING_EVENTS_BEFORE_UPLOAD = 120;
+const MAX_PENDING_EVENTS_BEFORE_UPLOAD = 60;
 const MAX_BEACON_PAYLOAD_BYTES = 60 * 1024; // sendBeacon 常见上限约 64KB，预留缓冲
 
 export function useRRWebRecorder({ 
   enabled, 
   recordingId,
-  uploadInterval = 10000, // 10 秒
-  debounceMs = 1500, // 1.5 秒防抖
+  uploadInterval = 3000, // 3 秒
+  debounceMs = 500, // 0.5 秒防抖
 }: UseRRWebRecorderOptions) {
   const [isRecording, setIsRecording] = useState(false);
   const [eventsCount, setEventsCount] = useState(0);

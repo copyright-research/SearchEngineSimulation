@@ -168,6 +168,34 @@ export async function list(options?: {
 }
 
 /**
+ * 列出某个前缀下的全部对象（自动翻页）
+ */
+export async function listAll(options?: {
+  prefix?: string;
+  limit?: number;
+}) {
+  const allBlobs: Array<{
+    url: string;
+    pathname: string;
+    size: number;
+    uploadedAt?: Date;
+  }> = [];
+
+  let cursor: string | undefined;
+  do {
+    const page = await list({
+      prefix: options?.prefix,
+      limit: options?.limit,
+      cursor,
+    });
+    allBlobs.push(...page.blobs);
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  return allBlobs;
+}
+
+/**
  * 获取文件内容
  * @param path 文件路径
  * @returns 文件内容
@@ -220,4 +248,3 @@ export async function del(pathOrUrl: string) {
 
   await r2Client.send(command);
 }
-

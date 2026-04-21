@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from 'react';
+import { ExperimentActivityTracker } from '@/components/ExperimentActivityTracker';
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,6 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+        <Suspense fallback={null}>
+          <ExperimentActivityTracker />
+        </Suspense>
         {children}
       </body>
     </html>

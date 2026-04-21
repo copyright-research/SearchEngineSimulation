@@ -4,7 +4,7 @@
  */
 
 import { groq } from '@ai-sdk/groq';
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { LanguageModel } from 'ai';
 
 // 支持的模型名称（直接使用 AI SDK 的模型名）
@@ -17,10 +17,19 @@ const GROQ_MODELS = [
 ] as const;
 
 const GOOGLE_MODELS = [
+  'gemini-3-flash-preview',
   'gemini-2.0-flash-exp',
   'gemini-1.5-pro',
   'gemini-1.5-flash',
 ] as const;
+
+const googleApiKey =
+  process.env.GEMINI_API_KEY ||
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+
+const googleProvider = googleApiKey
+  ? createGoogleGenerativeAI({ apiKey: googleApiKey })
+  : createGoogleGenerativeAI();
 
 // 默认模型配置（从环境变量读取）
 const DEFAULT_MODEL = process.env.AI_MODEL || 'llama-3.3-70b-versatile';
@@ -36,7 +45,7 @@ export function getModel(modelName: string = DEFAULT_MODEL): LanguageModel {
   }
   
   if (GOOGLE_MODELS.includes(modelName as typeof GOOGLE_MODELS[number])) {
-    return google(modelName);
+    return googleProvider(modelName);
   }
   
   // 未知模型，fallback 到默认
@@ -60,4 +69,3 @@ export function getQuestionGeneratorModel(): LanguageModel {
 export function getQueryRewriterModel(): LanguageModel {
   return getModel(process.env.AI_MODEL_QUERY_REWRITER || process.env.AI_MODEL);
 }
-

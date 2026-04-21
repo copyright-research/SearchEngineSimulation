@@ -150,3 +150,22 @@ model UserAnswer {
   @@index([questionId])
   @@map("user_answers")
 }
+
+model ExperimentActivitySession {
+  id             Int      @id @default(autoincrement())
+  rid            String
+  clientSessionId String   @map("client_session_id")
+  pagePath       String?   @map("page_path")
+  visibleTimeMs  Int       @default(0) @map("visible_time_ms")
+  clickCount     Int       @default(0) @map("click_count")
+  scrollCount    Int       @default(0) @map("scroll_count")
+  mousemoveCount Int       @default(0) @map("mousemove_count")
+  userAgent      String?   @map("user_agent")
+  lastSeenAt     DateTime  @map("last_seen_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([rid, clientSessionId])
+  @@index([rid])
+  @@map("experiment_activity_sessions")
+}

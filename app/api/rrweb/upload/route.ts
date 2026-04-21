@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, list } from '@/lib/r2-storage';
+import { put, list, listAll } from '@/lib/r2-storage';
 import { getParamCaseInsensitive } from '@/lib/url-utils';
 
 /**
@@ -177,61 +177,58 @@ export async function GET(request: NextRequest) {
 
     // 如果指定了 sessionId，返回该 session 的数据
     if (sessionId) {
-      // 首先尝试查找 merged 文件
+      // 优先读取全部 chunks。
+      // 目前 merged.json 只是冗余缓存，旧 chunks 并不会删除。
+      // 如果某个 session 在 merged 之后又继续上传新 chunk，直接返回 merged 会丢掉最新事件。
+      const chunks = await listAll({
+        prefix: `recordings/${recordingId}/${sessionId}/chunk-`,
+      });
+
+      if (chunks.length > 0) {
+        const sortedChunks = chunks
+          .sort((a, b) => {
+            const matchA = a.pathname.match(/chunk-(\d+)\.json$/);
+            const matchB = b.pathname.match(/chunk-(\d+)\.json$/);
+            const indexA = parseInt(matchA?.[1] || '0');
+            const indexB = parseInt(matchB?.[1] || '0');
+            return indexA - indexB;
+          })
+          .map(blob => `/api/rrweb/download?path=${encodeURIComponent(blob.pathname)}`);
+
+        return NextResponse.json({
+          type: 'chunks',
+          urls: sortedChunks,
+          count: sortedChunks.length,
+          sessionId,
+        });
+      }
+
+      // 只有在 chunk 已经被清理掉的情况下才回退到 merged 文件
       const mergedList = await list({
         prefix: `recordings/${recordingId}/${sessionId}/merged.json`,
         limit: 1,
       });
 
-      if (mergedList.blobs.length > 0) {
-        // 返回代理 URL 而不是直接的 R2 URL
-        const proxyUrl = `/api/rrweb/download?path=${encodeURIComponent(mergedList.blobs[0].pathname)}`;
-        return NextResponse.json({
-          type: 'merged',
-          url: proxyUrl,
-          sessionId,
-        });
-      }
-
-      // 否则，返回所有 chunks
-      const chunksList = await list({
-        prefix: `recordings/${recordingId}/${sessionId}/chunk-`,
-        limit: 1000,
-      });
-
-      if (chunksList.blobs.length === 0) {
+      if (mergedList.blobs.length === 0) {
         return NextResponse.json(
           { error: 'Session not found' },
           { status: 404 }
         );
       }
 
-      // 按 chunkIndex 排序，返回代理 URL
-      const sortedChunks = chunksList.blobs
-        .sort((a, b) => {
-          const matchA = a.pathname.match(/chunk-(\d+)\.json$/);
-          const matchB = b.pathname.match(/chunk-(\d+)\.json$/);
-          const indexA = parseInt(matchA?.[1] || '0');
-          const indexB = parseInt(matchB?.[1] || '0');
-          return indexA - indexB;
-        })
-        .map(blob => `/api/rrweb/download?path=${encodeURIComponent(blob.pathname)}`);
-
       return NextResponse.json({
-        type: 'chunks',
-        urls: sortedChunks,
-        count: sortedChunks.length,
+        type: 'merged',
+        url: `/api/rrweb/download?path=${encodeURIComponent(mergedList.blobs[0].pathname)}`,
         sessionId,
       });
     }
 
     // 如果没有指定 sessionId，返回所有 sessions
-    const allBlobs = await list({
+    const allBlobs = await listAll({
       prefix: `recordings/${recordingId}/`,
-      limit: 1000,
     });
 
-    if (allBlobs.blobs.length === 0) {
+    if (allBlobs.length === 0) {
       return NextResponse.json(
         { error: 'Recording not found' },
         { status: 404 }
@@ -240,7 +237,7 @@ export async function GET(request: NextRequest) {
 
     // 提取所有 sessionId
     const sessionsSet = new Set<string>();
-    for (const blob of allBlobs.blobs) {
+    for (const blob of allBlobs) {
       // 匹配: recordings/{RID}/{sessionId}/...
       const match = blob.pathname.match(/^recordings\/[^/]+\/([^/]+)\//);
       if (match) {

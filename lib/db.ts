@@ -1,4 +1,10 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import {
+  clampNonNegativeInt,
+  getExperimentQualificationStatus,
+  type ExperimentQualificationStatus,
+} from '@/lib/experiment-qualification';
 import type { SearchResult } from '@/types/search';
 
 /**
@@ -186,6 +192,135 @@ export async function getUserAnswerStats(rid: string) {
     correct,
     accuracy: total > 0 ? (correct / total) * 100 : 0,
   };
+}
+
+export interface ExperimentActivitySnapshotInput {
+  rid: string;
+  clientSessionId: string;
+  pagePath?: string | null;
+  visibleTimeMs: number;
+  clickCount: number;
+  scrollCount: number;
+  mousemoveCount: number;
+  lastSeenAt?: Date;
+  userAgent?: string | null;
+}
+
+export async function upsertExperimentActivitySnapshot(
+  input: ExperimentActivitySnapshotInput
+) {
+  const rid = input.rid.trim();
+  const clientSessionId = input.clientSessionId.trim();
+
+  if (!rid) {
+    throw new Error('RID is required');
+  }
+
+  if (!clientSessionId) {
+    throw new Error('clientSessionId is required');
+  }
+
+  const lastSeenAt = input.lastSeenAt ?? new Date();
+  const payload = {
+    pagePath: input.pagePath?.trim() || null,
+    visibleTimeMs: clampNonNegativeInt(input.visibleTimeMs),
+    clickCount: clampNonNegativeInt(input.clickCount),
+    scrollCount: clampNonNegativeInt(input.scrollCount),
+    mousemoveCount: clampNonNegativeInt(input.mousemoveCount),
+    lastSeenAt,
+    userAgent: input.userAgent?.trim() || null,
+  };
+
+  await prisma.$executeRaw(
+    Prisma.sql`
+      INSERT INTO "experiment_activity_sessions" (
+        "rid",
+        "client_session_id",
+        "page_path",
+        "visible_time_ms",
+        "click_count",
+        "scroll_count",
+        "mousemove_count",
+        "user_agent",
+        "last_seen_at",
+        "created_at",
+        "updated_at"
+      )
+      VALUES (
+        ${rid},
+        ${clientSessionId},
+        ${payload.pagePath},
+        ${payload.visibleTimeMs},
+        ${payload.clickCount},
+        ${payload.scrollCount},
+        ${payload.mousemoveCount},
+        ${payload.userAgent},
+        ${payload.lastSeenAt},
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("rid", "client_session_id") DO UPDATE
+      SET
+        "page_path" = CASE
+          WHEN EXCLUDED."last_seen_at" >= "experiment_activity_sessions"."last_seen_at"
+          THEN EXCLUDED."page_path"
+          ELSE "experiment_activity_sessions"."page_path"
+        END,
+        "visible_time_ms" = GREATEST(
+          "experiment_activity_sessions"."visible_time_ms",
+          EXCLUDED."visible_time_ms"
+        ),
+        "click_count" = GREATEST(
+          "experiment_activity_sessions"."click_count",
+          EXCLUDED."click_count"
+        ),
+        "scroll_count" = GREATEST(
+          "experiment_activity_sessions"."scroll_count",
+          EXCLUDED."scroll_count"
+        ),
+        "mousemove_count" = GREATEST(
+          "experiment_activity_sessions"."mousemove_count",
+          EXCLUDED."mousemove_count"
+        ),
+        "user_agent" = COALESCE(EXCLUDED."user_agent", "experiment_activity_sessions"."user_agent"),
+        "last_seen_at" = GREATEST(
+          "experiment_activity_sessions"."last_seen_at",
+          EXCLUDED."last_seen_at"
+        ),
+        "updated_at" = CURRENT_TIMESTAMP
+    `
+  );
+}
+
+export async function getExperimentStatusByRid(
+  rid: string
+): Promise<ExperimentQualificationStatus> {
+  const normalizedRid = rid.trim();
+  if (!normalizedRid) {
+    return getExperimentQualificationStatus({
+      visibleTimeMs: 0,
+      clickCount: 0,
+      scrollCount: 0,
+      mousemoveCount: 0,
+    });
+  }
+
+  const aggregate = await prisma.experimentActivitySession.aggregate({
+    where: { rid: normalizedRid },
+    _sum: {
+      visibleTimeMs: true,
+      clickCount: true,
+      scrollCount: true,
+      mousemoveCount: true,
+    },
+  });
+
+  return getExperimentQualificationStatus({
+    visibleTimeMs: aggregate._sum.visibleTimeMs ?? 0,
+    clickCount: aggregate._sum.clickCount ?? 0,
+    scrollCount: aggregate._sum.scrollCount ?? 0,
+    mousemoveCount: aggregate._sum.mousemoveCount ?? 0,
+  });
 }
 
 /**

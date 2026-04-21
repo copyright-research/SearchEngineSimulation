@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { list } from '@/lib/r2-storage';
+import { listAll } from '@/lib/r2-storage';
 
 /**
  * 获取所有录制列表
@@ -7,10 +7,9 @@ import { list } from '@/lib/r2-storage';
  */
 export async function GET() {
   try {
-    // 列出所有录制
-    const allBlobs = await list({
+    // 列出所有录制；必须自动翻页，否则对象超过 1000 后会漏掉最新会话
+    const allBlobs = await listAll({
       prefix: 'recordings/',
-      limit: 1000,
     });
 
     // 按 recordingId 和 sessionId 分组
@@ -26,7 +25,7 @@ export async function GET() {
 
     const recordingsMap = new Map<string, RecordingInfo>();
 
-    for (const blob of allBlobs.blobs) {
+    for (const blob of allBlobs) {
       // 匹配 recordings/{RID}/{sessionId}/chunk-{index}.json
       const chunkMatch = blob.pathname.match(/^recordings\/([^/]+)\/([^/]+)\/chunk-(\d+)\.json$/);
       if (chunkMatch) {
@@ -99,4 +98,3 @@ export async function GET() {
     );
   }
 }
-
