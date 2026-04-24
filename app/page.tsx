@@ -6,6 +6,7 @@ import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
 import SearchResults from '@/components/SearchResults';
 import AIOverview from '@/components/AIOverview';
+import AIOverviewLoading from '@/components/AIOverviewLoading';
 import type { GoogleSearchResponse, SearchResult } from '@/types/search';
 import { RRWebRecorder } from '@/components/RRWebRecorder';
 import { useSearchHistory } from '@/lib/use-search-history';
@@ -204,6 +205,10 @@ function HomeContent() {
 
         {/* 内容区域 - 与 SearchBar 左对齐 */}
         <div className={`transition-[margin] duration-200 ${hasSearched ? 'xl:ml-[182px]' : ''}`}>
+          {showAIOverview && currentPage === 1 && hasSearched && isLoading && !error && (
+            <AIOverviewLoading stage="searching" />
+          )}
+
           {/* AI Overview - 只在第一页显示 */}
           {showAIOverview && currentPage === 1 && hasSearched && !isLoading && !error && results.length > 0 && (
             <AIOverview 

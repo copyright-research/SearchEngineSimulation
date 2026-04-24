@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
+import AIOverviewLoading from '@/components/AIOverviewLoading';
 import type { SearchResult } from '@/types/search';
 import { useDebugDepsDeep } from '@/lib/use-debug-deps';
 import { useSearchHistory } from '@/lib/use-search-history';
@@ -406,11 +407,7 @@ export default function AIOverview({ query, results, onAIResponseComplete, histo
         {/* Content */}
         <div className={`overflow-hidden transition-all duration-300 ${isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`} style={{ backgroundColor: 'transparent' }}>
           {isLoading && !completion ? (
-            <div className="p-5 space-y-3">
-              <div className="h-3 rounded" style={{ backgroundColor: 'var(--google-border)', animation: 'pulse 1.5s ease-in-out infinite' }}></div>
-              <div className="h-3 rounded w-5/6" style={{ backgroundColor: 'var(--google-border)', animation: 'pulse 1.5s ease-in-out infinite' }}></div>
-              <div className="h-3 rounded w-4/6" style={{ backgroundColor: 'var(--google-border)', animation: 'pulse 1.5s ease-in-out infinite' }}></div>
-            </div>
+            <AIOverviewLoading embedded stage="generating" sourceCount={enhancedResults.length || results.length} />
           ) : (
             <>
               <div 

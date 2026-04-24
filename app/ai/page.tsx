@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
+import AIChatLoading from '@/components/AIChatLoading';
 import { RRWebRecorder } from '@/components/RRWebRecorder';
 import type { SearchResult } from '@/types/search';
 import { useSearchHistory } from '@/lib/use-search-history';
@@ -174,6 +175,25 @@ function AIModePageContent() {
 
   const [input, setInput] = useState('');
 
+  const getMessageText = (message: typeof messages[number]) =>
+    message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => ('text' in part ? part.text : ''))
+      .join('');
+
+  const isResponding = status === 'submitted' || status === 'streaming';
+  const latestMessage = messages.at(-1);
+  const latestAssistantText =
+    latestMessage?.role === 'assistant' ? getMessageText(latestMessage).trim() : '';
+  const shouldShowPendingAssistant =
+    messages.length > 0 &&
+    isResponding &&
+    (
+      latestMessage?.role === 'user' ||
+      (latestMessage?.role === 'assistant' && latestAssistantText.length === 0)
+    );
+  const pendingAssistantStage = status === 'submitted' ? 'submitted' : 'streaming';
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (hasAutoPromptedRef.current) return;
@@ -277,10 +297,10 @@ function AIModePageContent() {
 
   // 当消息更新时，只有用户在底部才自动滚动
   useEffect(() => {
-    if (status === 'streaming' && isUserAtBottom) {
+    if (isResponding && isUserAtBottom) {
       scrollToBottom();
     }
-  }, [messages, status, isUserAtBottom]);
+  }, [isResponding, messages, isUserAtBottom]);
 
   // Sources 现在直接从 AI 响应的 data 字段中获取，不再需要单独关联
 
@@ -369,7 +389,7 @@ function AIModePageContent() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Ask a question..."
-                    disabled={status === 'streaming'}
+                    disabled={isResponding}
                     className="w-full px-6 py-4 pr-14 text-base transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       border: '1px solid var(--google-border)',
@@ -400,24 +420,24 @@ function AIModePageContent() {
                   />
                   <button
                     type="submit"
-                    disabled={status === 'streaming' || !input.trim()}
+                    disabled={isResponding || !input.trim()}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
-                      backgroundColor: status === 'streaming' || !input.trim() ? 'transparent' : 'var(--google-blue)',
+                      backgroundColor: isResponding || !input.trim() ? 'transparent' : 'var(--google-blue)',
                       color: '#ffffff'
                     }}
                     onMouseEnter={(e) => {
-                      if (!(status === 'streaming' || !input.trim())) {
+                      if (!(isResponding || !input.trim())) {
                         e.currentTarget.style.backgroundColor = 'var(--google-blue-dark)';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!(status === 'streaming' || !input.trim())) {
+                      if (!(isResponding || !input.trim())) {
                         e.currentTarget.style.backgroundColor = 'var(--google-blue)';
                       }
                     }}
                   >
-                    {status === 'streaming' ? (
+                    {isResponding ? (
                       <Loader size={20} className="text-blue-600" />
                     ) : (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,10 +494,7 @@ function AIModePageContent() {
               <div className="space-y-4 mb-6 flex-shrink-0 w-full">
                 {messages.map((message, index) => {
                   // Extract text content
-                  const fullText = message.parts
-                    .filter((part) => part.type === 'text')
-                    .map((part) => ('text' in part ? part.text : ''))
-                    .join('');
+                  const fullText = getMessageText(message);
 
                   // Parse related questions if present
                   const parts = fullText.split('__RELATED_QUESTIONS__');
@@ -961,6 +978,10 @@ function AIModePageContent() {
                     </div>
                   );
                 })}
+
+                {shouldShowPendingAssistant && (
+                  <AIChatLoading stage={pendingAssistantStage} />
+                )}
               </div>
               
               {/* 弹性空间 - 推动内容到顶部，底部留白 */}
@@ -987,7 +1008,7 @@ function AIModePageContent() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask a follow-up question..."
-                  disabled={status === 'streaming'}
+                  disabled={isResponding}
                   className="w-full px-6 py-3 pr-14 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     border: '1px solid var(--google-border)',
@@ -1017,24 +1038,24 @@ function AIModePageContent() {
                 />
                 <button
                   type="submit"
-                  disabled={status === 'streaming' || !input.trim()}
+                  disabled={isResponding || !input.trim()}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    backgroundColor: status === 'streaming' || !input.trim() ? 'transparent' : 'var(--google-blue)',
+                    backgroundColor: isResponding || !input.trim() ? 'transparent' : 'var(--google-blue)',
                     color: '#ffffff'
                   }}
                   onMouseEnter={(e) => {
-                    if (!(status === 'streaming' || !input.trim())) {
+                    if (!(isResponding || !input.trim())) {
                       e.currentTarget.style.backgroundColor = 'var(--google-blue-dark)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!(status === 'streaming' || !input.trim())) {
+                    if (!(isResponding || !input.trim())) {
                       e.currentTarget.style.backgroundColor = 'var(--google-blue)';
                     }
                   }}
                 >
-                  {status === 'streaming' ? (
+                  {isResponding ? (
                     <Loader size={18} className="text-blue-600" />
                   ) : (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
