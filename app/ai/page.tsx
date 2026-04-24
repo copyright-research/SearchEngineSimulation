@@ -584,6 +584,29 @@ function AIModePageContent() {
                             
                             {/* Content - Reuse Response Component */}
                             <div style={{ color: 'var(--google-text)' }}>
+                              {isStreaming && (
+                                <div
+                                  className="mb-4 inline-flex items-center gap-3 rounded-full px-4 py-2.5"
+                                  style={{
+                                    backgroundColor: '#e8f0fe',
+                                    border: '1px solid #d2e3fc',
+                                    color: '#1967d2',
+                                  }}
+                                >
+                                  <Loader size={16} className="text-blue-600" />
+                                  <span
+                                    style={{
+                                      fontFamily: "'Google Sans', Roboto, Arial, sans-serif",
+                                      fontSize: '13px',
+                                      fontWeight: 500,
+                                      lineHeight: '18px',
+                                    }}
+                                  >
+                                    Generating answer...
+                                  </span>
+                                </div>
+                              )}
+
                               <Response
                                 onCitationClick={(numbers) => {
                                   console.log('Citation clicked:', numbers, 'for message:', message.id);
@@ -594,13 +617,6 @@ function AIModePageContent() {
                               >
                                 {mainContent}
                               </Response>
-                              
-                              {/* Loading Indicator */}
-                              {status === 'streaming' && index === messages.length - 1 && (
-                                <span className="inline-flex items-center ml-2 align-middle">
-                                  <Loader size={14} className="text-blue-600" />
-                                </span>
-                              )}
 
                               {/* Footer with Disclaimer and Feedback Buttons */}
                               {!isStreaming && (
