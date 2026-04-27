@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
 import rrwebPlayer from 'rrweb-player';
 import 'rrweb-player/dist/style.css';
 import type { eventWithTime } from '@rrweb/types';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { RRWebAnalyzer } from '@/lib/rrweb-analyzer';
 import { analyzeSearchABMetrics, type SearchABMetrics } from '@/lib/rrweb-search-ab-metrics';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
@@ -91,6 +91,10 @@ function sanitizeFileSegment(input: string): string {
   return input.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'rid';
 }
 
+function normalizeRid(input: string): string {
+  return input.trim().toLowerCase();
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -148,12 +152,21 @@ export default function ReplayPage() {
   const [searchABMetrics, setSearchABMetrics] = useState<SearchABMetrics | null>(null);
   const [downloadingBundle, setDownloadingBundle] = useState(false);
   const [bundleProgress, setBundleProgress] = useState('');
+  const [ridInput, setRidInput] = useState('');
+  const [ridLookupError, setRidLookupError] = useState<string | null>(null);
   const [leftWidth, setLeftWidth] = useState(30); // 左侧宽度百分比
   const [isResizing, setIsResizing] = useState(false);
   
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerInstanceRef = useRef<InstanceType<typeof rrwebPlayer> | null>(null);
+  const autoLoadedRidRef = useRef<string | null>(null);
   const router = useRouter();
+  const params = useParams<{ rid?: string | string[] }>();
+  const routeRid = useMemo(() => {
+    const value = params?.rid;
+    const rid = Array.isArray(value) ? value[0] : value;
+    return typeof rid === 'string' ? rid.trim() : '';
+  }, [params]);
 
   // 加载录制列表
   useEffect(() => {
@@ -180,7 +193,7 @@ export default function ReplayPage() {
   };
 
   // 加载选中的录制
-  const loadRecording = async (recording: RecordingInfo) => {
+  const loadRecording = useCallback(async (recording: RecordingInfo) => {
     setLoading(true);
     setError(null);
     setSelectedRecording(recording);
@@ -234,6 +247,51 @@ export default function ReplayPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const findRecordingByRid = useCallback((rid: string) => {
+    const normalizedRid = normalizeRid(rid);
+    return recordings.find((recording) => normalizeRid(recording.recordingId) === normalizedRid) || null;
+  }, [recordings]);
+
+  useEffect(() => {
+    if (routeRid) {
+      setRidInput(routeRid);
+    }
+  }, [routeRid]);
+
+  useEffect(() => {
+    if (loadingList || !routeRid) return;
+
+    const normalizedRid = normalizeRid(routeRid);
+    if (!normalizedRid || autoLoadedRidRef.current === normalizedRid) return;
+
+    const recording = findRecordingByRid(routeRid);
+    if (!recording) {
+      setRidLookupError(`No recording found for RID "${routeRid}".`);
+      return;
+    }
+
+    autoLoadedRidRef.current = normalizedRid;
+    setRidLookupError(null);
+    loadRecording(recording);
+  }, [findRecordingByRid, loadRecording, loadingList, routeRid]);
+
+  const openRid = (rid: string) => {
+    const nextRid = rid.trim();
+    if (!nextRid) {
+      setRidLookupError('Enter a research ID.');
+      return;
+    }
+
+    setRidLookupError(null);
+    const recording = findRecordingByRid(nextRid);
+    if (recording) {
+      autoLoadedRidRef.current = normalizeRid(nextRid);
+      loadRecording(recording);
+    }
+
+    router.push(`/replay/${encodeURIComponent(nextRid)}`);
   };
 
   // 计算并初始化播放器尺寸
@@ -750,6 +808,36 @@ export default function ReplayPage() {
                 {loadingList ? 'Loading...' : 'Refresh'}
               </button>
             </div>
+            <form
+              className="mt-3 flex items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                openRid(ridInput);
+              }}
+            >
+              <input
+                value={ridInput}
+                onChange={(event) => {
+                  setRidInput(event.target.value);
+                  if (ridLookupError) setRidLookupError(null);
+                }}
+                aria-label="Research ID"
+                placeholder="Research ID / RID"
+                className="min-w-0 flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+              <button
+                type="submit"
+                disabled={!ridInput.trim()}
+                className="px-3 py-2 text-sm bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 dark:bg-gray-100 dark:hover:bg-white dark:disabled:bg-gray-700 text-white dark:text-gray-900 dark:disabled:text-gray-400 rounded transition-colors"
+              >
+                Open
+              </button>
+            </form>
+            {ridLookupError && (
+              <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+                {ridLookupError}
+              </div>
+            )}
           </div>
 
           <div className="flex-1">
